@@ -15,6 +15,15 @@ void request_init(cs_request_t *req)
 	req->req_type = -1;
 }
 
+void request_free(cs_request_t *req)
+{
+	cs_free(&req->name);
+	cs_free(&req->passwd);
+	cs_free(&req->datetime);
+	cs_free(&req->buddy_name);
+	cs_free(&req->content);
+}
+
 void request_dump(cs_request_t *req)
 {
 	D("***********************************");
@@ -54,19 +63,19 @@ cs_request_t cs_parse_request(char *buf)
 
 		switch (i) {
 			case 0:
-				req.name = token;
+				req.name = strdup(token);
 				break;
 			case 1:
-				req.passwd = token;
+				req.passwd = strdup(token);
 				break;
 			case 2:
-				req.datetime = token;
+				req.datetime = strdup(token);
 				break;
 			case 3:
-				req.buddy_name = token;
+				req.buddy_name = strdup(token);
 				break;
 			case 4:
-				req.content = token;
+				req.content = strdup(token);
 				break;
 			default:
 				DD(i);
@@ -84,7 +93,7 @@ cs_request_t cs_parse_request(char *buf)
 
 int sql_check_identity_cb(void *p, int argc, char **value, char **name)
 {
-	*(int *)p = argc;
+	(*(int *)p)++;
 	return 0;
 }
 
@@ -194,18 +203,17 @@ int main(int argc, char *argv[])
 				E("cs_parse_request() failed.");
 				break;
 			}
-			// FIXME: why req.name is empty : to L81 cs_free(&buf_copy);
 			request_dump(&req);
 
 			memset(query_line, '\0', query_len_max);
-			sprintf(query_line, "select * from user where name='tom' and passwd='tom'");//, req.passwd);
+			sprintf(query_line, "select * from user where name='%s' and passwd='%s'", req.name, req.passwd);
 			DS(query_line);
 
-			// FIXME: how to judge select is ok : count call callback function of time
-			ret = sqlite3_exec(db, query_line, sql_check_identity_cb, NULL, NULL);
-			//if (ret == SQLITE_ABORT) {
-			if (ret != SQLITE_OK) {
+			int sql_select_num = 0;
+			ret = sqlite3_exec(db, query_line, sql_check_identity_cb, &sql_select_num, NULL);
+			if (ret == SQLITE_ABORT || sql_select_num != 1) {
 				E("sqlite3_exec() failed.");
+				DD(sql_select_num);
 				break;
 			}
 
@@ -213,7 +221,7 @@ int main(int argc, char *argv[])
 			memset(query_line, '\0', query_len_max);
 
 			/* get buddy name list */
-			sprintf(query_line, "select * from troy");
+			sprintf(query_line, "select * from %s", req.name);
 			DS(query_line);
 
 			cs_str_t buddy;
@@ -221,15 +229,14 @@ int main(int argc, char *argv[])
 			buddy.len = strlen(buf);
 
 			ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &buddy, NULL);
-			DD(ret);
-			//if (ret == SQLITE_ABORT) {
-			if (ret != SQLITE_OK) {
+			if (ret == SQLITE_ABORT) {
 				E("sqlite3_exec() failed.");
 				break;
 			}
 			DDSTR(buddy);
 
-			//strncpy(buf, "hello", 5);
+			request_free(&req);
+
 			s = write(peer_sockfd, buf, strlen(buf));
 			if (s == -1) {
 				E("%s", strerror(errno));
