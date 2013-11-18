@@ -18,8 +18,6 @@ yum install sqlite.i686
 
 how to use?
 ==============================================
-make
-
 root@cs# make
 
 root@cs# ./cs       /* default port: 8888 */
