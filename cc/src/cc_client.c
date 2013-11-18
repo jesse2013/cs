@@ -7,7 +7,13 @@
 
 int main(int argc, char *argv[])
 {
-	D("hello world.");
+	char *req = ":troy:troy:20131117100404:ivy:hello world.";
+	if (argc != 2) {
+		P("usage: ./cc \":troy:troy:20131117100404:ivy:hello world.\"");
+		//return -1;
+	} else {
+        req = argv[1];
+    }
 
 	int sockfd = -1;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -44,7 +50,6 @@ int main(int argc, char *argv[])
 	}
 
 	ssize_t s = 0;
-	char *req = ":troy:troy:20131117100404:ivy:hello world.";
 	//while (1) {
 		strncpy(buf, req, strlen(req));
 		s = write(sockfd, buf, strlen(buf));
