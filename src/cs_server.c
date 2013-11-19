@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
             cs_request_t req = cs_parse_request(buf);
             if (req.name == NULL) {
                 E("cs_parse_request() failed.");
-                break;
+                continue;
             }
             request_dump(&req);
 
@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
                     E("%s", strerror(errno));
                 }
                 D("send sign * to client.");
-                break;
+                continue;
             }
 
             memset(buf, '\0', buflen);
@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
             ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &buddy, NULL);
             if (ret == SQLITE_ABORT) {
                 E("sqlite3_exec() failed.");
-                break;
+                continue;
             }
             DDSTR(buddy);
 
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
                     E("%s", strerror(errno));
                 }
                 D("send sign : to client.");
-                break;
+                continue;
             }
 
             s = write(peer_sockfd, buf, strlen(buf));
