@@ -7,13 +7,15 @@
 
 int main(int argc, char *argv[])
 {
-	char *req = ":troy:troy:20131117100404:ivy:hello world.";
-	if (argc != 2) {
-		P("usage: ./cc \":troy:troy:20131117100404:ivy:hello world.\"");
-		//return -1;
-	} else {
-        req = argv[1];
-    }
+#if 0
+    :troy:troy:20131117100404:ivy:hello.
+    client向server发送的请求类型
+    :0:name:passwd:20131117100404           //注册
+    :1:name:passwd:20131117100404           //登录
+    :2:20131117100404               //查看所有用户
+    :3:ivy:20131117100404:hello world.      //发送聊天消息
+    :4:ivy                      //查看聊天记录
+#endif
 
 	int sockfd = -1;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -21,7 +23,6 @@ int main(int argc, char *argv[])
 		E("%s", strerror(errno));
 		return -1;
 	}
-
 	
 	struct sockaddr_in addr;
 	socklen_t addrlen = sizeof(addr);
@@ -37,7 +38,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	char str[INET_ADDRSTRLEN];
-	D("received from %s at PORT %d", 
+	D("connect %s at PORT %d success.", 
 			inet_ntop(AF_INET, &addr.sin_addr, str, 
 				sizeof(str)), 
 			ntohs(addr.sin_port));
@@ -50,8 +51,10 @@ int main(int argc, char *argv[])
 	}
 
 	ssize_t s = 0;
-	//while (1) {
-		strncpy(buf, req, strlen(req));
+	while (1) {
+        scanf("%s", buf);
+        DS(buf);
+
 		s = write(sockfd, buf, strlen(buf));
 		if (s == -1) {
 			E("%s", strerror(errno));
@@ -70,7 +73,7 @@ int main(int argc, char *argv[])
 		memset(buf, '\0', buflen);
 
 		//sleep(1);
-	//}
+	}
 
 	cs_free(&buf);
 
