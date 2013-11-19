@@ -22,8 +22,16 @@ root@cs# make
 
 root@cs# ./cs       /* default port: 8888 */
 
-root@cs# cd cc
+root@cs# ./cs/cc
 
-root@cs# make
+/* request type that client send to server */
 
-root@cc# ./cc ":troy:troy:20131117100404:ivy:hello world."
+:0:name:passwd:20131117100404           //register
+
+:1:name:passwd:20131117100404           //login
+
+:2:20131117100404                       //view all user
+
+:3:ivy:20131117100404:hello world.      //send content to ivy
+
+:4:ivy                                  //view log with ivy
