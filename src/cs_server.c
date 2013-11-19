@@ -27,12 +27,12 @@ void request_free(cs_request_t *req)
 void request_dump(cs_request_t *req)
 {
     D("***********************************");
+    DD(req->req_type);
     DSIF(req->name);
     DSIF(req->passwd);
     DSIF(req->datetime);
     DSIF(req->buddy_name);
     DSIF(req->content);
-    DD(req->req_type);
     D("***********************************");
 }
 
@@ -63,18 +63,21 @@ cs_request_t cs_parse_request(char *buf)
 
         switch (i) {
             case 0:
-                req.name = strdup(token);
+                req.req_type = atoi(token);
                 break;
             case 1:
-                req.passwd = strdup(token);
+                req.name = strdup(token);
                 break;
             case 2:
-                req.datetime = strdup(token);
+                req.passwd = strdup(token);
                 break;
             case 3:
-                req.buddy_name = strdup(token);
+                req.datetime = strdup(token);
                 break;
             case 4:
+                req.buddy_name = strdup(token);
+                break;
+            case 5:
                 req.content = strdup(token);
                 break;
             default:
@@ -109,6 +112,8 @@ int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
 
 int main(int argc, char *argv[])
 {
+    cs_t cs;
+
     int sockfd = -1;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -123,8 +128,16 @@ int main(int argc, char *argv[])
         E("%s", strerror(errno));
         return -1;
     }
-    //ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT,
-            //&optval, sizeof(optval));
+
+#ifdef SO_REUSEPORT
+    optval = 1;
+    ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT,
+            &optval, sizeof(optval));
+    if (ret == -1) {
+        E("%s", strerror(errno));
+        return -1;
+    }
+#endif
     
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);

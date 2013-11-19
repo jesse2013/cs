@@ -10,6 +10,10 @@
 
 #include "cs_debug.h"
 
+
+#define FD_MAX  1024
+
+
 typedef struct {
     int req_type;
     char *name;
@@ -50,10 +54,11 @@ typedef struct {
 } cli_buf_t;
 
 typedef struct {
-    int fd_max;
     int serv_fd;
-    int cli_fd_list;
-    cli_buf_t cli_buf;
+
+    int fd_num;
+    int cli_fd[FD_MAX];
+    cli_buf_t cli_buf[FD_MAX];
 } cs_t;
 
 
