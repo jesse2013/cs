@@ -37,8 +37,36 @@ void request_free(cs_request_t *req)
 }
 
 
+int sql_create_cb(void *p, int argc, char **value, char **name)
+{
+    return 0;
+}
+
+int sql_insert_cb(void *p, int argc, char **value, char **name)
+{
+    return 0;
+}
+
+int sql_select_cb(void *p, int argc, char **value, char **name)
+{
+    return 0;
+}
+
+int sql_update_cb(void *p, int argc, char **value, char **name)
+{
+    return 0;
+}
+
+int sql_delete_cb(void *p, int argc, char **value, char **name)
+{
+    return 0;
+}
+
+
 char *sql_register(cs_request_t *req)
 {
+    /* insert */
+    /* create */
     return NULL;
 }
 
@@ -61,6 +89,8 @@ int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
 
 char *sql_login(cs_request_t *req)
 {
+    /* check identify */
+    /* return buddy list */
 #if 0
     memset(query_line, '\0', query_len_max);
     sprintf(query_line, "select * from user where name='%s' and passwd='%s'", req.name, req.passwd);
@@ -115,18 +145,31 @@ char *sql_login(cs_request_t *req)
 
 char *sql_view_user(cs_request_t *req)
 {
+    /* return all user */
     return NULL;
 }
 
 
 char *sql_sendto(cs_request_t *req)
 {
+    /* send content to ivy */
+    /* insert my log with ivy */
+    /* insert ivy log with me */
     return NULL;
 }
 
 
 char *sql_view_log(cs_request_t *req)
 {
+    /* return chat log with ivy */
+    return NULL;
+}
+
+
+char *sql_delete(cs_request_t *req)
+{
+    /* check identify */
+    /* delete user */
     return NULL;
 }
 
@@ -217,8 +260,12 @@ char *sql_routine(char *buf)
             ret = sql_sendto(&req);
             break;
         case 4:
-            /* send content to ivy */
+            /* view log with ivy */
             ret = sql_view_log(&req);
+            break;
+        case 5:
+            /* delete user */
+            ret = sql_delete(&req);
             break;
         default:
             break;
@@ -330,6 +377,10 @@ int main(int argc, char *argv[])
             DS(buf);
 
             ret_buf = sql_routine(buf);
+            if (ret_buf == NULL) {
+                E("sql_routine() failed.");
+                break;
+            }
 
             s = write(peer_sockfd, ret_buf, strlen(ret_buf));
             if (s == -1) {
