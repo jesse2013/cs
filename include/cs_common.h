@@ -33,6 +33,7 @@
 #include <ctype.h> //tolower()
 #include <math.h> // -lm
 #include <pthread.h> // -lpthread
+#include <regex.h>
 
 
 typedef struct {

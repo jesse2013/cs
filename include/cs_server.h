@@ -11,7 +11,8 @@
 #include "cs_debug.h"
 
 
-#define FD_MAX  1024
+#define FD_MAX          1024
+#define QUERY_LEN_MAX   512
 
 
 typedef struct {
