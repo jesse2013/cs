@@ -42,7 +42,7 @@ int sql_create_cb(void *p, int argc, char **value, char **name)
     return 0;
 }
 
-int sql_insert_cb(void *p, int argc, char **value, char **name)
+int sql_insert_cb()
 {
     return 0;
 }
@@ -63,16 +63,44 @@ int sql_delete_cb(void *p, int argc, char **value, char **name)
 }
 
 
-char *sql_register(cs_request_t *req)
+int sql_register(cs_request_t *req, sqlite3 *db)
 {
     if (req->name == NULL || req->passwd == NULL) {
         E("parameter error.");
+        return -1;
+    }
+
+    /* insert user info to user tables */
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        return -1;
+    }
+
+    sprintf(query_line, "insert into user(id, name, passwd) values(10, '%s', '%s')", req->name, req->passwd);
+    DS(query_line);
+
+    int ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
         return NULL;
     }
 
-    /* insert */
-    /* create */
-    return NULL;
+    /* create private tables */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "create table %s(id integer primary key, name text, online text)" , req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    cs_free(&query_line);
+    return 0;
 }
 
 
@@ -309,7 +337,7 @@ char *sql_routine(char *buf)
     switch (req.req_type) {
         case 0:
             /* register */
-            ret = sql_register(&req);
+            sql_register(&req, db);
             break;
         case 1:
             /* login - check username & passwd */
