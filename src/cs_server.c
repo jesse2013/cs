@@ -15,15 +15,6 @@ void request_init(cs_request_t *req)
     req->req_type = -1;
 }
 
-void request_free(cs_request_t *req)
-{
-    cs_free(&req->name);
-    cs_free(&req->passwd);
-    cs_free(&req->datetime);
-    cs_free(&req->buddy_name);
-    cs_free(&req->content);
-}
-
 void request_dump(cs_request_t *req)
 {
     D("***********************************");
@@ -35,6 +26,110 @@ void request_dump(cs_request_t *req)
     DSIF(req->content);
     D("***********************************");
 }
+
+void request_free(cs_request_t *req)
+{
+    cs_free(&req->name);
+    cs_free(&req->passwd);
+    cs_free(&req->datetime);
+    cs_free(&req->buddy_name);
+    cs_free(&req->content);
+}
+
+
+char *sql_register(cs_request_t *req)
+{
+    return NULL;
+}
+
+
+int sql_check_identity_cb(void *p, int argc, char **value, char **name)
+{
+    (*(int *)p)++;
+    return 0;
+}
+
+int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
+{
+    cs_str_t *buddy = (cs_str_t *)p;
+
+    sprintf(buddy->data + buddy->len, ":%s-%s", value[1], value[2]);
+    buddy->len = strlen(buddy->data);
+
+    return 0;
+}
+
+char *sql_login(cs_request_t *req)
+{
+#if 0
+    memset(query_line, '\0', query_len_max);
+    sprintf(query_line, "select * from user where name='%s' and passwd='%s'", req.name, req.passwd);
+    DS(query_line);
+
+    int sql_select_num = 0;
+    ret = sqlite3_exec(db, query_line, sql_check_identity_cb, &sql_select_num, NULL);
+    if (ret == SQLITE_ABORT || sql_select_num != 1) {
+        E("sqlite3_exec() failed.");
+        DD(sql_select_num);
+        s = write(peer_sockfd, "*", 1);
+        if (s == -1) {
+            E("%s", strerror(errno));
+        }
+        D("send sign * to client.");
+        continue;
+    }
+
+    memset(buf, '\0', buflen);
+    memset(query_line, '\0', query_len_max);
+
+    /* get buddy name list */
+    sprintf(query_line, "select * from %s", req.name);
+    DS(query_line);
+
+    cs_str_t buddy;
+    buddy.data = buf;
+    buddy.len = strlen(buf);
+
+    ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &buddy, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        continue;
+    }
+    DDSTR(buddy);
+
+    request_free(&req);
+
+    if (strlen(buf) == 0) {
+        s = write(peer_sockfd, ":", 1);
+        if (s == -1) {
+            E("%s", strerror(errno));
+        }
+        D("send sign : to client.");
+        continue;
+    }
+    return NULL;
+#endif
+    return NULL;
+}
+
+
+char *sql_view_user(cs_request_t *req)
+{
+    return NULL;
+}
+
+
+char *sql_sendto(cs_request_t *req)
+{
+    return NULL;
+}
+
+
+char *sql_view_log(cs_request_t *req)
+{
+    return NULL;
+}
+
 
 cs_request_t cs_parse_request(char *buf)
 {
@@ -94,26 +189,47 @@ cs_request_t cs_parse_request(char *buf)
     return req;
 }
 
-int sql_check_identity_cb(void *p, int argc, char **value, char **name)
+char *sql_routine(char *buf)
 {
-    (*(int *)p)++;
-    return 0;
+    char *ret = NULL; 
+    cs_request_t req = cs_parse_request(buf);
+    if (req.name == NULL) {
+        E("cs_parse_request() failed.");
+        return NULL;
+    }
+    request_dump(&req);
+
+    switch (req.req_type) {
+        case 0:
+            /* register */
+            ret = sql_register(&req);
+            break;
+        case 1:
+            /* login - check username & passwd */
+            ret = sql_login(&req);
+            break;
+        case 2:
+            /* view all user */
+            ret = sql_view_user(&req);
+            break;
+        case 3:
+            /* send content to ivy */
+            ret = sql_sendto(&req);
+            break;
+        case 4:
+            /* send content to ivy */
+            ret = sql_view_log(&req);
+            break;
+        default:
+            break;
+    }
+
+    return ret; 
 }
 
-int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
-{
-    cs_str_t *buddy = (cs_str_t *)p;
-
-    sprintf(buddy->data + buddy->len, ":%s-%s", value[1], value[2]);
-    buddy->len = strlen(buddy->data);
-
-    return 0;
-}
 
 int main(int argc, char *argv[])
 {
-    cs_t cs;
-
     int sockfd = -1;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -189,6 +305,7 @@ int main(int argc, char *argv[])
     int peer_sockfd = -1;
     ssize_t s = 0;
     char str[INET_ADDRSTRLEN];
+    char *ret_buf = NULL;
     while (1) {
         peer_sockfd = accept(sockfd,
                 (struct sockaddr *)&peer_addr, &peer_addrlen);
@@ -212,65 +329,15 @@ int main(int argc, char *argv[])
             }
             DS(buf);
 
-            /* check username & passwd */
-            cs_request_t req = cs_parse_request(buf);
-            if (req.name == NULL) {
-                E("cs_parse_request() failed.");
-                continue;
-            }
-            request_dump(&req);
+            ret_buf = sql_routine(buf);
 
-            memset(query_line, '\0', query_len_max);
-            sprintf(query_line, "select * from user where name='%s' and passwd='%s'", req.name, req.passwd);
-            DS(query_line);
-
-            int sql_select_num = 0;
-            ret = sqlite3_exec(db, query_line, sql_check_identity_cb, &sql_select_num, NULL);
-            if (ret == SQLITE_ABORT || sql_select_num != 1) {
-                E("sqlite3_exec() failed.");
-                DD(sql_select_num);
-                s = write(peer_sockfd, "*", 1);
-                if (s == -1) {
-                    E("%s", strerror(errno));
-                }
-                D("send sign * to client.");
-                continue;
-            }
-
-            memset(buf, '\0', buflen);
-            memset(query_line, '\0', query_len_max);
-
-            /* get buddy name list */
-            sprintf(query_line, "select * from %s", req.name);
-            DS(query_line);
-
-            cs_str_t buddy;
-            buddy.data = buf;
-            buddy.len = strlen(buf);
-
-            ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &buddy, NULL);
-            if (ret == SQLITE_ABORT) {
-                E("sqlite3_exec() failed.");
-                continue;
-            }
-            DDSTR(buddy);
-
-            request_free(&req);
-
-            if (strlen(buf) == 0) {
-                s = write(peer_sockfd, ":", 1);
-                if (s == -1) {
-                    E("%s", strerror(errno));
-                }
-                D("send sign : to client.");
-                continue;
-            }
-
-            s = write(peer_sockfd, buf, strlen(buf));
+            s = write(peer_sockfd, ret_buf, strlen(ret_buf));
             if (s == -1) {
                 E("%s", strerror(errno));
                 break;
             }
+
+            cs_free(&ret_buf);
         }
     }
 
