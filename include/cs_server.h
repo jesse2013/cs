@@ -16,50 +16,39 @@
 
 
 typedef struct {
-    int req_type;
-    char *name;
-    char *passwd;
-    char *buddy_name;
-    char *content;
-    char *datetime;
+    int         req_type;
+    char        *name;
+    char        *passwd;
+    char        *buddy_name;
+    char        *content;
+    char        *datetime;
 } cs_request_t;
-
-
-typedef struct {
-    char *name;
-    char *passwd;
-} cs_user_t;
-
-typedef struct {
-    char *name;
-    char *online;
-} cs_buddy_t;
-
-typedef struct {
-    char *name;
-    char *content;
-    char *datetime;
-} cs_his_t;
 
 
 #define BUF_INCREMENT   1024
 
 typedef struct {
-    char *r_buf;
-    int r_len;
-    int r_len_max;
+    char        *r_buf;
+    int         r_len;
+    int         r_len_max;
 
-    char *w_buf;
-    int w_len;
-    int w_len_max;
+    char        *w_buf;
+    int         w_len;
+    int         w_len_max;
 } cli_buf_t;
 
 typedef struct {
-    int serv_fd;
+    int         serv_fd;
 
-    int fd_num;
-    int cli_fd[FD_MAX];
-    cli_buf_t cli_buf[FD_MAX];
+    int         cli_fd[FD_MAX];
+    cli_buf_t   cli_buf[FD_MAX];
+
+    int         nfds;
+    fd_set      *readfds;
+    fd_set      *writefds;
+    fd_set      *exceptfds;
+
+    sqlite3     *db;
 } cs_t;
 
 
