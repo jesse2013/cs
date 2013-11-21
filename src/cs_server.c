@@ -5,66 +5,167 @@
 #include "cs_server.h"
 
 
-void cst_init(cs_t *cst)
+#define PORT        8888
+
+
+sockfd_buf_t **sockfd_list = NULL;
+int sockfd_list_num = 0;
+
+int maxfd = 0;
+fd_set rfds;
+fd_set wfds;
+fd_set efds;
+
+
+int sockfd_list_init(int n)
 {
-    cst->serv_fd = -1;
-
-    //cst->cli_fd = {-1};
-    //cst->cli_buf = NULL;
-
-    cst->nfds = -1;;
-    //cst->readfds
-    //cst->writefds
-    //cst->exceptfds
-
-    //cst->db = NULL;
-}
-
-void cst_free(cs_t *cst)
-{
-}
-
-int cst_accept(int i)
-{
-    /*
-    struct sockaddr_in peer_addr;
-    socklen_t peer_addrlen = sizeof(peer_addr);
-
-    memset(&peer_addr, '\0', peer_addrlen);
-
-    size_t buflen = 512;
-    char *buf = (char *)cs_malloc(sizeof(char) * buflen);
-    if (buf == NULL) {
+    sockfd_list = (sockfd_buf_t **)cs_malloc(sizeof(sockfd_buf_t *) * n);
+    if (sockfd_list == NULL) {
         E("cs_malloc() failed.");
         return -1;
     }
-    cs_free(&buf);
 
-    D("received from %s at PORT %d",
-      inet_ntop(AF_INET, &peer_addr.sin_addr, str, sizeof(str)), 
-      ntohs(peer_addr.sin_port));
-      */
-    return -1;
+    int i = 0;
+    for (; i < n; i++)
+        sockfd_list[i] = NULL;
+
+    sockfd_list_num = n;
+    return 0;
+    
 }
 
-int cst_routine(int i)
+void register_readfd(int fd)
 {
+    FD_SET(fd, &rfds);
+
+    if (maxfd < fd)
+        maxfd = fd;
+}
+
+void register_writefd(int fd)
+{
+    FD_SET(fd, &wfds);
+
+    if (maxfd < fd)
+        maxfd = fd;
+}
+
+void register_exceptfd(int fd)
+{
+    FD_SET(fd, &efds);
+
+    if (maxfd < fd)
+        maxfd = fd;
+}
+
+
+buf_t buf_init(void)
+{
+    buf_t buf = {NULL, 0, 0};
+
+    buf.data = (char *)cs_malloc(sizeof(char) * BUF_MAX);
+    if (buf.data == NULL) {
+        E("cs_malloc() failed.");
+        return buf;
+    }
+
+    buf.len = 0;
+    buf.max = BUF_MAX;
+
+    return buf;
+}
+
+sockfd_buf_t *sockfd_buf_init(void)
+{
+    sockfd_buf_t *rwbuf = (sockfd_buf_t *)cs_malloc(sizeof(sockfd_buf_t));
+    if (rwbuf == NULL) {
+        E("cs_malloc() failed.");
+        return NULL;
+    }
+
+    rwbuf->rbuf = buf_init();
+    rwbuf->wbuf = buf_init();
+
+    if (rwbuf->rbuf.data == NULL || rwbuf->wbuf.data == NULL) {
+        E("buf_init() failed.");
+        cs_free(&rwbuf->wbuf);
+        cs_free(&rwbuf->rbuf);
+        cs_free(&rwbuf);
+        return NULL;
+    }
+
+    return rwbuf;
+}
+
+int cs_accept(int servfd)
+{
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    memset(&addr, '\0', addrlen);
+
+    int clifd = accept(servfd, (struct sockaddr *)&addr, &addrlen);
+    if (clifd < 0) {
+        E("accept() failed.");
+        return -1;
+    }
+
+	char ip_str[INET_ADDRSTRLEN];
+    D("accept connect come from %s port %d",
+      inet_ntop(AF_INET, &addr.sin_addr, ip_str, sizeof(ip_str)), 
+      ntohs(addr.sin_port));
+
+    sockfd_buf_t *rwbuf = sockfd_buf_init();
+    if (rwbuf == NULL) {
+        E("sockfd_buf_init() failed.");
+        return -1;
+    }
+
+    sockfd_list[clifd] = rwbuf;
+    register_readfd(clifd);
+
     return 0;
 }
 
+int cs_routine(int fd)
+{
+    sockfd_buf_t *rwbuf = sockfd_list[fd];
+
+    if (rwbuf == NULL)
+        return -1;
+    if (rwbuf->rbuf.data == NULL)
+        return -1;
+    if (rwbuf->wbuf.data == NULL)
+        return -1;
+
+    int n = read(fd, rwbuf->rbuf.data, rwbuf->rbuf.max);
+    if (n == -1) {
+        E("%s", strerror(errno));
+        return -1;
+    }
+
+    D("received %s %d bytes on %d.\n", rwbuf->rbuf.data, n, fd);
+    memset(rwbuf->rbuf.data, 0, rwbuf->rbuf.max);
+
+    return 0;
+}
+
+
 int main(int argc, char *argv[])
 {
-    cs_t cst;
-    cst_init(&cst);
+    int ret = sockfd_list_init(1024);
+    if (ret < 0) {
+        E("sockfd_list_init() failed.");
+        return -1;
+    }
 
-    cst.serv_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (cst.serv_fd == -1) {
+    int servfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (servfd == -1) {
         E("%s", strerror(errno));
         return -1;
     }
 
     int optval = 1;
-    int ret = setsockopt(cst.serv_fd, SOL_SOCKET, SO_REUSEADDR,
+    ret = setsockopt(servfd, SOL_SOCKET, SO_REUSEADDR,
             &optval, sizeof(optval));
     if (ret == -1) {
         E("%s", strerror(errno));
@@ -73,7 +174,7 @@ int main(int argc, char *argv[])
 
 #ifdef SO_REUSEPORT
     optval = 1;
-    ret = setsockopt(cst.serv_fd, SOL_SOCKET, SO_REUSEPORT,
+    ret = setsockopt(servfd, SOL_SOCKET, SO_REUSEPORT,
             &optval, sizeof(optval));
     if (ret == -1) {
         E("%s", strerror(errno));
@@ -86,47 +187,53 @@ int main(int argc, char *argv[])
 
     memset(&addr, '\0', addrlen);
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(8888);
+    addr.sin_port = htons(PORT);
     addr.sin_addr.s_addr = INADDR_ANY;
 
-    ret = bind(cst.serv_fd, (struct sockaddr *)&addr, addrlen);
+    ret = bind(servfd, (struct sockaddr *)&addr, addrlen);
     if (ret == -1) {
         E("%s", strerror(errno));
         return -1;
     } else
-        D("bind 127.0.0.1:8888 successfully.");
+        D("bind 127.0.0.1:%d successfully.", PORT);
 
-    ret = listen(cst.serv_fd, cst.listen_num);
+    int backlog = 20;
+    ret = listen(servfd, backlog);
     if (ret == -1) {
         E("%s", strerror(errno));
         return -1;
     }
 
-    FD_ZERO(&cst.readfds);
-    FD_ZERO(&cst.writefds);
-    FD_ZERO(&cst.exceptfds);
+    FD_ZERO(&rfds);
+    FD_ZERO(&wfds);
+    FD_ZERO(&efds);
 
+    register_readfd(servfd);
+
+    struct timeval timeout;
     int n = 0;
     int i = 0;
+
     while (1) {
-        n = select(cst.nfds + 1, &cst.readfds, &cst.writefds,
-                &cst.exceptfds, &cst.timeout);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+
+        n = select(maxfd + 1, &rfds, &wfds, &efds, &timeout);
         if (n < 0) {
             if (errno == EINTR)
                 continue;
-
             E("select() faile.");
             break;
         } else if (n == 0) {
             D("timeout, nothing to be done.");
         } else {
-            for (i = 0; i <= cst.nfds; i++) {
-                if (FD_ISSET(i, &cst.readfds)) {
-                    if (i == cst.serv_fd)
-                        cst_accept(i);
+            for (i = 0; i <= maxfd; i++) {
+                if (FD_ISSET(i, &rfds)) {
+                    if (i == servfd)
+                        cs_accept(i);
                     else
-                        cst_routine(i);
-                } else if (FD_ISSET(i, &cst.writefds)) {
+                        cs_routine(i);
+                } else if (FD_ISSET(i, &wfds)) {
                     D("write occurrence.");
                 } else
                     E("except occurrence.");
@@ -134,6 +241,5 @@ int main(int argc, char *argv[])
         }
     }
 
-    cst_free(&cst);
     return 0;
 }
