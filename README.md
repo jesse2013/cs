@@ -222,7 +222,11 @@ root@cs# make
 root@cs# ./cs       /* default port: 8888 */
 
 root@cs# ./cc/cc
+
 [8.16:39:21.476]:cc->src/cc_client.c->main:00044 --> connect 127.0.0.1 at PORT 8888 success.
+
 :1:troy:troy:::
+
 [8.16:39:25.779]:cc->src/cc_client.c->main:00056 --> buf=:1:troy:troy:::
+
 [8.16:39:25.783]:cc->src/cc_client.c->main:00072 --> buf=:ivy-on:cy-off:jdy-on
