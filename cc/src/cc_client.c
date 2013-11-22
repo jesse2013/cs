@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 	ssize_t s = 0;
 	while (1) {
         scanf("%s", buf);
-        DS(buf);
+        D(GREEN"sendto server %s %d bytes."NO, buf, strlen(buf));
 
 		s = write(sockfd, buf, strlen(buf));
 		if (s == -1) {
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 			cs_free(&buf);
 			return -1;
 		}
-		DS(buf);
+        D(GREEN"recvfrom server %s %d bytes."NO, buf, strlen(buf));
 		memset(buf, '\0', buflen);
 	}
 
