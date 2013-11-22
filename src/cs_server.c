@@ -12,9 +12,7 @@ sockfd_buf_t **sockfd_list = NULL;
 int sockfd_list_num = 0;
 
 int maxfd = 0;
-fd_set rfds;
-fd_set wfds;
-fd_set efds;
+fd_set rfds_g, wfds_g, efds_g;
 
 
 int sockfd_list_init(int n)
@@ -36,7 +34,7 @@ int sockfd_list_init(int n)
 
 void register_readfd(int fd)
 {
-    FD_SET(fd, &rfds);
+    FD_SET(fd, &rfds_g);
 
     if (maxfd < fd)
         maxfd = fd;
@@ -44,7 +42,7 @@ void register_readfd(int fd)
 
 void register_writefd(int fd)
 {
-    FD_SET(fd, &wfds);
+    FD_SET(fd, &wfds_g);
 
     if (maxfd < fd)
         maxfd = fd;
@@ -52,7 +50,7 @@ void register_writefd(int fd)
 
 void register_exceptfd(int fd)
 {
-    FD_SET(fd, &efds);
+    FD_SET(fd, &efds_g);
 
     if (maxfd < fd)
         maxfd = fd;
@@ -143,7 +141,7 @@ int cs_routine(int fd)
         return -1;
     }
 
-    D("received %s %d bytes on %d.\n", rwbuf->rbuf.data, n, fd);
+    D("received %s %d bytes on %d.", rwbuf->rbuf.data, n, fd);
     memset(rwbuf->rbuf.data, 0, rwbuf->rbuf.max);
 
     return 0;
@@ -194,8 +192,7 @@ int main(int argc, char *argv[])
     if (ret == -1) {
         E("%s", strerror(errno));
         return -1;
-    } else
-        D("bind 127.0.0.1:%d successfully.", PORT);
+    }
 
     int backlog = 20;
     ret = listen(servfd, backlog);
@@ -204,17 +201,25 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    FD_ZERO(&rfds);
-    FD_ZERO(&wfds);
-    FD_ZERO(&efds);
+    FD_ZERO(&rfds_g);
+    FD_ZERO(&wfds_g);
+    FD_ZERO(&efds_g);
 
     register_readfd(servfd);
 
+    fd_set rfds, wfds, efds;
+
     struct timeval timeout;
+
     int n = 0;
     int i = 0;
 
+    D("cs server start 0.0.0.0 %d", PORT);
     while (1) {
+        rfds = rfds_g;
+        wfds = wfds_g;
+        efds = efds_g;
+
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
 
@@ -225,7 +230,7 @@ int main(int argc, char *argv[])
             E("select() faile.");
             break;
         } else if (n == 0) {
-            D("timeout, nothing to be done.");
+            //D("timeout, nothing to be done.");
         } else {
             for (i = 0; i <= maxfd; i++) {
                 if (FD_ISSET(i, &rfds)) {
@@ -235,8 +240,8 @@ int main(int argc, char *argv[])
                         cs_routine(i);
                 } else if (FD_ISSET(i, &wfds)) {
                     D("write occurrence.");
-                } else
-                    E("except occurrence.");
+                } //else
+                    //E("except occurrence.");
             }
         }
     }

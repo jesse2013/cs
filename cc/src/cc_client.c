@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
 			cs_free(&buf);
 			return -1;
 		}
+#if 0
 		memset(buf, '\0', buflen);
 
 		s = read(sockfd, buf, buflen);
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
 			return -1;
 		}
 		DS(buf);
+#endif
 		memset(buf, '\0', buflen);
 
 		//sleep(1);
