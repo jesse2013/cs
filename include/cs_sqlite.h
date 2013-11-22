@@ -24,7 +24,7 @@ typedef struct {
 } cs_request_t;
 
 
-char *sql_routine(sockfd_buf_t *rwbuf);
+int sql_routine(sockfd_buf_t *rwbuf);
 
 
 #endif /* _CS_SQLITE_H_INCLUDED_ */

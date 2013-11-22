@@ -144,8 +144,11 @@ int cs_routine(int fd)
 
     D(GREEN"received %s %d bytes from %d."NO, rwbuf->rbuf.data, n, fd);
 
-    // FIXME: return value type
-    sql_routine(rwbuf);
+    n = sql_routine(rwbuf);
+    if (n == -1) {
+        E("sql_routine() failed.");
+        return -1;
+    }
 
     //DDSTR(rwbuf->wbuf);
     n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.len);
@@ -251,11 +254,17 @@ int main(int argc, char *argv[])
             for (i = 0; i <= maxfd; i++) {
                 if (FD_ISSET(i, &rfds)) {
                     if (i == servfd) {
-                        // FIXME: check return value
-                        cs_accept(i);
+                        ret = cs_accept(i);
+                        if (ret == -1) {
+                            E("cs_accept() failed.");
+                            break;
+                        }
                     } else {
-                        // FIXME: check return value
-                        cs_routine(i);
+                        ret = cs_routine(i);
+                        if (ret == -1) {
+                            E("cs_routine() failed.");
+                            break;
+                        }
                     }
                 } else if (FD_ISSET(i, &wfds)) {
                     D("write occurrence.");
