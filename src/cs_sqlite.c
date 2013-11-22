@@ -112,11 +112,9 @@ int sql_check_identity_cb(void *p, int argc, char **value, char **name)
 
 int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
 {
-    char *buf = (char *)p;
-    int len = strlen(buf);
-
-    sprintf(buf + len, ":%s-%s", value[1], value[2]);
-
+    cs_str_t *sbuf = (cs_str_t *)p;
+    sprintf(sbuf->data + sbuf->len, ":%s-%s", value[1], value[2]);
+    sbuf->len = strlen(sbuf->data);
     return 0;
 }
 
@@ -166,14 +164,16 @@ char *sql_login(cs_request_t *req, sqlite3 *db)
         return NULL;
     }
 
-    ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &buf, NULL);
+    cs_str_t sbuf = {buf, 0};
+
+    ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &sbuf, NULL);
     if (ret == SQLITE_ABORT) {
         E("sqlite3_exec() failed.");
         cs_free(&buf);
         cs_free(&query_line);
         return NULL;
     }
-    DS(buf);
+    DDSTR(sbuf);
 
     if (strlen(buf) == 0) {
         /*
@@ -277,21 +277,27 @@ cs_request_t cs_parse_request(char *buf)
 
         switch (i) {
             case 0:
+                /* req_type */
                 req.req_type = atoi(token);
                 break;
             case 1:
+                /* user name */
                 req.name = strdup(token);
                 break;
             case 2:
+                /* user passwd */
                 req.passwd = strdup(token);
                 break;
             case 3:
+                /* buddy name */
                 req.buddy_name = strdup(token);
                 break;
             case 4:
+                /* content */
                 req.content = strdup(token);
                 break;
             case 5:
+                /* datatime */
                 req.datetime = strdup(token);
                 break;
             default:

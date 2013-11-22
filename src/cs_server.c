@@ -142,6 +142,13 @@ int cs_routine(int fd)
     }
 
     D("received %s %d bytes on %d.", rwbuf->rbuf.data, n, fd);
+
+    char *ret = sql_routine(rwbuf->rbuf.data);
+    if (ret == NULL) {
+        E("sql_routine() failed.");
+        return -1;
+    }
+
     memset(rwbuf->rbuf.data, 0, rwbuf->rbuf.max);
 
     return 0;
@@ -240,8 +247,11 @@ int main(int argc, char *argv[])
                         cs_routine(i);
                 } else if (FD_ISSET(i, &wfds)) {
                     D("write occurrence.");
-                } //else
-                    //E("except occurrence.");
+                } else if (FD_ISSET(i, &efds)) {
+                    E("except occurrence.");
+                } else {
+                    //E("undefined.");
+                }
             }
         }
     }
