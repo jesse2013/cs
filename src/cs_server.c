@@ -142,19 +142,22 @@ int cs_routine(int fd)
     }
     rwbuf->rbuf.len = n;
 
-    D("received %s %d bytes from %d.", rwbuf->rbuf.data, n, fd);
+    D(GREEN"received %s %d bytes from %d."NO, rwbuf->rbuf.data, n, fd);
 
     // FIXME: return value type
     sql_routine(rwbuf);
 
-    n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.max);
+    //DDSTR(rwbuf->wbuf);
+    n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.len);
     if (n == -1) {
         E("%s", strerror(errno));
         return -1;
     }
 
     memset(rwbuf->wbuf.data, 0, rwbuf->wbuf.max);
+    rwbuf->wbuf.len = 0;
     memset(rwbuf->rbuf.data, 0, rwbuf->rbuf.max);
+    rwbuf->rbuf.len = 0;
 
     return 0;
 }
@@ -242,14 +245,17 @@ int main(int argc, char *argv[])
             E("select() faile.");
             break;
         } else if (n == 0) {
-            D("timeout, nothing to be done.");
+            //D("timeout, nothing to be done.");
         } else {
             for (i = 0; i <= maxfd; i++) {
                 if (FD_ISSET(i, &rfds)) {
-                    if (i == servfd)
+                    if (i == servfd) {
+                        // FIXME: check return value
                         cs_accept(i);
-                    else
+                    } else {
+                        // FIXME: check return value
                         cs_routine(i);
+                    }
                 } else if (FD_ISSET(i, &wfds)) {
                     D("write occurrence.");
                 } else if (FD_ISSET(i, &efds)) {
