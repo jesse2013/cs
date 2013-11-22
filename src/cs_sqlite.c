@@ -165,7 +165,7 @@ int sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         cs_free(&query_line);
         return -1;
     }
-    DPSTR(wbuf);
+    //DPSTR(wbuf);
 
     /* user haven't buddy */
     if (wbuf->len == 0) {
@@ -317,9 +317,13 @@ int sql_routine(sockfd_buf_t *rwbuf)
     char *regex = "^:[0-9]{1}:[A-Za-z0-9_]*:[A-Za-z0-9_]*:"
                     "[A-Za-z0-9_]*:.*:[0-9]{0,14}$";
     if (cs_regex(rwbuf->rbuf.data, regex) != 0) {
-        E("cs_regex() failed.");
+        //E("cs_regex() failed.");
+        E("request type undefined.");
         DDSTR(rwbuf->rbuf);
-        return -1;
+
+        strncpy(rwbuf->wbuf.data, "00", 2);
+        rwbuf->wbuf.len = 2;
+        return 0;
     }
 
     cs_request_t req = cs_parse_request(rwbuf->rbuf.data);

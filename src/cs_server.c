@@ -7,7 +7,6 @@
 
 #define PORT        8888
 
-
 sockfd_buf_t **sockfd_list = NULL;
 int sockfd_list_num = 0;
 
@@ -17,7 +16,8 @@ fd_set rfds_g, wfds_g, efds_g;
 
 int sockfd_list_init(int n)
 {
-    sockfd_list = (sockfd_buf_t **)cs_malloc(sizeof(sockfd_buf_t *) * n);
+    sockfd_list = (sockfd_buf_t **)cs_malloc(
+                    sizeof(sockfd_buf_t *) * n);
     if (sockfd_list == NULL) {
         E("cs_malloc() failed.");
         return -1;
@@ -39,7 +39,6 @@ void register_readfd(int fd)
     if (maxfd < fd)
         maxfd = fd;
 }
-
 void register_writefd(int fd)
 {
     FD_SET(fd, &wfds_g);
@@ -47,13 +46,25 @@ void register_writefd(int fd)
     if (maxfd < fd)
         maxfd = fd;
 }
-
 void register_exceptfd(int fd)
 {
     FD_SET(fd, &efds_g);
 
     if (maxfd < fd)
         maxfd = fd;
+}
+
+void unregister_readfd(int fd)
+{
+    FD_CLR(fd, &rfds_g);
+}
+void unregister_writefd(int fd)
+{
+    FD_CLR(fd, &wfds_g);
+}
+void unregister_exceptfd(int fd)
+{
+    FD_CLR(fd, &efds_g);
 }
 
 
@@ -75,7 +86,8 @@ buf_t buf_init(void)
 
 sockfd_buf_t *sockfd_buf_init(void)
 {
-    sockfd_buf_t *rwbuf = (sockfd_buf_t *)cs_malloc(sizeof(sockfd_buf_t));
+    sockfd_buf_t *rwbuf = (sockfd_buf_t *)cs_malloc(
+                            sizeof(sockfd_buf_t));
     if (rwbuf == NULL) {
         E("cs_malloc() failed.");
         return NULL;
@@ -95,6 +107,16 @@ sockfd_buf_t *sockfd_buf_init(void)
     return rwbuf;
 }
 
+void sockfd_buf_free(sockfd_buf_t *rwbuf)
+{
+    if (rwbuf == NULL)
+        return;
+
+    cs_free(&rwbuf->rbuf.data);
+    cs_free(&rwbuf->wbuf.data);
+    cs_free(&rwbuf);
+}
+
 int cs_accept(int servfd)
 {
     struct sockaddr_in addr;
@@ -108,7 +130,7 @@ int cs_accept(int servfd)
     }
 
 	char ip_str[INET_ADDRSTRLEN];
-    D("accept connect come from %s port %d",
+    D(GREEN"accept client %d from %s port %d"NO, clifd,
       inet_ntop(AF_INET, &addr.sin_addr, ip_str, sizeof(ip_str)), 
       ntohs(addr.sin_port));
 
@@ -136,21 +158,34 @@ int cs_routine(int fd)
         return -1;
 
     int n = read(fd, rwbuf->rbuf.data, rwbuf->rbuf.max);
-    if (n <= 0) {
+    if (n < 0) {
         E("%s", strerror(errno));
         return -1;
+    } else if (n == 0) {
+        sockfd_buf_free(rwbuf);
+        sockfd_list[fd] = NULL;
+
+        unregister_readfd(fd);
+        unregister_writefd(fd);
+        unregister_exceptfd(fd);
+
+        D(GREEN"client %d is closed."NO, fd);
+        close(fd);
+        return 0;
     }
+
+    D(GREEN"receive %s %d bytes from %d."NO, 
+      rwbuf->rbuf.data, n, fd);
+
     rwbuf->rbuf.len = n;
-
-    D(GREEN"received %s %d bytes from %d."NO, rwbuf->rbuf.data, n, fd);
-
     n = sql_routine(rwbuf);
     if (n == -1) {
         E("sql_routine() failed.");
         return -1;
     }
 
-    //DDSTR(rwbuf->wbuf);
+    D(GREEN"send %s %d bytes from %d."NO, 
+      rwbuf->wbuf.data, rwbuf->wbuf.len, fd);
     n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.len);
     if (n == -1) {
         E("%s", strerror(errno));
@@ -232,7 +267,7 @@ int main(int argc, char *argv[])
     int n = 0;
     int i = 0;
 
-    D("cs server start 0.0.0.0 %d", PORT);
+    D("cs start 0.0.0.0 %d", PORT);
     while (1) {
         rfds = rfds_g;
         wfds = wfds_g;
@@ -277,5 +312,6 @@ int main(int argc, char *argv[])
         }
     }
 
+    close(servfd);
     return 0;
 }

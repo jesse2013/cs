@@ -39,9 +39,8 @@ int main(int argc, char *argv[])
 	}
 	char str[INET_ADDRSTRLEN];
 	D("connect %s at PORT %d success.", 
-			inet_ntop(AF_INET, &addr.sin_addr, str, 
-				sizeof(str)), 
-			ntohs(addr.sin_port));
+      inet_ntop(AF_INET, &addr.sin_addr, str, sizeof(str)), 
+      ntohs(addr.sin_port));
 
 	size_t buflen = 512;
 	char *buf = (char *)cs_malloc(sizeof(char) * buflen);
@@ -53,7 +52,7 @@ int main(int argc, char *argv[])
 	ssize_t s = 0;
 	while (1) {
         scanf("%s", buf);
-        D(GREEN"sendto server %s %d bytes."NO, buf, strlen(buf));
+        D(GREEN"send %s %d bytes."NO, buf, strlen(buf));
 
 		s = write(sockfd, buf, strlen(buf));
 		if (s == -1) {
@@ -64,12 +63,15 @@ int main(int argc, char *argv[])
 		memset(buf, '\0', buflen);
 
 		s = read(sockfd, buf, buflen);
-		if (s == -1) {
+		if (s < 0) {
 			E("%s", strerror(errno));
 			cs_free(&buf);
 			return -1;
-		}
-        D(GREEN"recvfrom server %s %d bytes."NO, buf, strlen(buf));
+		} else if (s == 0) {
+            D("server is closed."); 
+            return -1;
+        }
+        D(GREEN"receive %s %d bytes."NO, buf, strlen(buf));
 		memset(buf, '\0', buflen);
 	}
 
