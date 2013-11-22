@@ -118,9 +118,73 @@ int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
     return 0;
 }
 
+#if 0
 char *sql_login(cs_request_t *req, sqlite3 *db)
 {
     if (req->name == NULL || req->passwd == NULL) {
+        E("parameter error.");
+        return NULL;
+    }
+
+    char *buf = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (buf == NULL) {
+        E("cs_malloc() failed.");
+        return NULL;
+    }
+
+    /* check identify */
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        cs_free(&buf);
+        return NULL;
+    }
+
+    sprintf(query_line, "select * from user where name='%s' and passwd='%s'", 
+            req->name, req->passwd);
+    DS(query_line);
+
+    int sql_select_num = 0;
+    int ret = sqlite3_exec(db, query_line, sql_check_identity_cb, 
+                &sql_select_num, NULL);
+    if (ret == SQLITE_ABORT || sql_select_num != 1) {
+        /* no this user & passwd */
+        E("sqlite3_exec() failed.");
+        DD(sql_select_num);
+        cs_free(&query_line);
+
+        strncpy(buf, "*", 1);
+        return buf;
+    }
+
+    /* get buddy name list */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "select * from %s", req->name);
+    DS(query_line);
+
+    cs_str_t sbuf = {buf, 0};
+    ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &sbuf, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        cs_free(&buf);
+        return NULL;
+    }
+    DDSTR(sbuf);
+
+    /* user haven't buddy */
+    if (sbuf.len == 0)
+        strncpy(buf, ":", 1);
+
+    cs_free(&query_line);
+    return buf;
+}
+#endif
+
+char *sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    if (req->name == NULL || req->passwd == NULL || db == NULL || 
+        wbuf == NULL || wbuf->data == NULL) {
         E("parameter error.");
         return NULL;
     }
@@ -129,26 +193,25 @@ char *sql_login(cs_request_t *req, sqlite3 *db)
     char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
     if (query_line == NULL) {
         E("cs_malloc() failed.");
+        DPSTR(wbuf);
         return NULL;
     }
 
-    sprintf(query_line, "select * from user where name='%s' and passwd='%s'", req->name, req->passwd);
+    sprintf(query_line, "select * from user where name='%s' and passwd='%s'", 
+            req->name, req->passwd);
     DS(query_line);
 
     int sql_select_num = 0;
-    int ret = sqlite3_exec(db, query_line, sql_check_identity_cb, &sql_select_num, NULL);
+    int ret = sqlite3_exec(db, query_line, sql_check_identity_cb, 
+                &sql_select_num, NULL);
     if (ret == SQLITE_ABORT || sql_select_num != 1) {
+        /* no this user & passwd */
         E("sqlite3_exec() failed.");
         DD(sql_select_num);
-        /*
-        s = write(peer_sockfd, "*", 1);
-        if (s == -1) {
-            E("%s", strerror(errno));
-        }
-        D("send sign * to client.");
-        continue;
-        */
         cs_free(&query_line);
+
+        strncpy(wbuf->data, "*", 1);
+        wbuf->len = 1;
         return NULL;
     }
 
@@ -157,37 +220,23 @@ char *sql_login(cs_request_t *req, sqlite3 *db)
     sprintf(query_line, "select * from %s", req->name);
     DS(query_line);
 
-    char *buf = (char *)cs_malloc(sizeof(char) * 512);
-    if (buf == NULL) {
-        E("cs_malloc() failed.");
-        cs_free(&query_line);
-        return NULL;
-    }
-
-    cs_str_t sbuf = {buf, 0};
-
+    cs_str_t sbuf = {wbuf->data, 0};
     ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, &sbuf, NULL);
     if (ret == SQLITE_ABORT) {
         E("sqlite3_exec() failed.");
-        cs_free(&buf);
         cs_free(&query_line);
         return NULL;
     }
     DDSTR(sbuf);
 
-    if (strlen(buf) == 0) {
-        /*
-        s = write(peer_sockfd, ":", 1);
-        if (s == -1) {
-            E("%s", strerror(errno));
-        
-        D("send sign : to client.");
-        continue;
-        */
+    /* user haven't buddy */
+    if (sbuf.len == 0) {
+        strncpy(wbuf->data, ":", 1);
+        wbuf->len = 1;
     }
 
     cs_free(&query_line);
-    return buf;
+    return NULL;
 }
 
 
@@ -314,23 +363,28 @@ cs_request_t cs_parse_request(char *buf)
     return req;
 }
 
-char *sql_routine(char *buf)
+char *sql_routine(sockfd_buf_t *rwbuf)
 {
-    if (buf == NULL) {
+    if (rwbuf == NULL || rwbuf->rbuf.data == NULL || rwbuf->rbuf.len == 0 || 
+        rwbuf->wbuf.data == NULL) {
         E("parameter error.");
+        DP(rwbuf);
+        DP(rwbuf->rbuf.data);
+        DD(rwbuf->rbuf.len);
+        DP(rwbuf->wbuf.data);
         return NULL;
     }
 
     /* :0:name:passwd:name:content:datetime */
     char *regex = "^:[0-9]{1}:[A-Za-z0-9_]*:[A-Za-z0-9_]*:"
                     "[A-Za-z0-9_]*:.*:[0-9]{0,14}$";
-    if (cs_regex(buf, regex) != 0) {
+    if (cs_regex(rwbuf->rbuf.data, regex) != 0) {
         E("cs_regex() failed.");
-        DS(buf);
+        DDSTR(rwbuf->rbuf);
         return NULL;
     }
 
-    cs_request_t req = cs_parse_request(buf);
+    cs_request_t req = cs_parse_request(rwbuf->rbuf.data);
     request_dump(&req);
 
     sqlite3 *db;
@@ -347,7 +401,7 @@ char *sql_routine(char *buf)
             break;
         case 1:
             /* login - check username & passwd */
-            ret = sql_login(&req, db);
+            ret = sql_login(&req, db, &rwbuf->wbuf);
             break;
         case 2:
             /* view all user */

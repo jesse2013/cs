@@ -136,19 +136,24 @@ int cs_routine(int fd)
         return -1;
 
     int n = read(fd, rwbuf->rbuf.data, rwbuf->rbuf.max);
+    if (n <= 0) {
+        E("%s", strerror(errno));
+        return -1;
+    }
+    rwbuf->rbuf.len = n;
+
+    D("received %s %d bytes from %d.", rwbuf->rbuf.data, n, fd);
+
+    // FIXME: return value type
+    sql_routine(rwbuf);
+
+    n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.max);
     if (n == -1) {
         E("%s", strerror(errno));
         return -1;
     }
 
-    D("received %s %d bytes on %d.", rwbuf->rbuf.data, n, fd);
-
-    char *ret = sql_routine(rwbuf->rbuf.data);
-    if (ret == NULL) {
-        E("sql_routine() failed.");
-        return -1;
-    }
-
+    memset(rwbuf->wbuf.data, 0, rwbuf->wbuf.max);
     memset(rwbuf->rbuf.data, 0, rwbuf->rbuf.max);
 
     return 0;
@@ -237,7 +242,7 @@ int main(int argc, char *argv[])
             E("select() faile.");
             break;
         } else if (n == 0) {
-            //D("timeout, nothing to be done.");
+            D("timeout, nothing to be done.");
         } else {
             for (i = 0; i <= maxfd; i++) {
                 if (FD_ISSET(i, &rfds)) {
@@ -250,7 +255,7 @@ int main(int argc, char *argv[])
                 } else if (FD_ISSET(i, &efds)) {
                     E("except occurrence.");
                 } else {
-                    //E("undefined.");
+                    //E("undefined occurrence.");
                 }
             }
         }
