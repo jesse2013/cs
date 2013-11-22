@@ -247,6 +247,7 @@ int main(int argc, char *argv[])
         } else if (n == 0) {
             //D("timeout, nothing to be done.");
         } else {
+            /* FIXME: while (n--) */
             for (i = 0; i <= maxfd; i++) {
                 if (FD_ISSET(i, &rfds)) {
                     if (i == servfd) {
