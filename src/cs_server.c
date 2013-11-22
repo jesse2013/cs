@@ -117,6 +117,7 @@ void sockfd_buf_free(sockfd_buf_t *rwbuf)
     cs_free(&rwbuf);
 }
 
+
 int cs_accept(int servfd)
 {
     struct sockaddr_in addr;
@@ -146,7 +147,7 @@ int cs_accept(int servfd)
     return 0;
 }
 
-int cs_routine(int fd)
+int cs_routine(int fd, sqlite3 *db)
 {
     sockfd_buf_t *rwbuf = sockfd_list[fd];
 
@@ -178,13 +179,13 @@ int cs_routine(int fd)
       rwbuf->rbuf.data, n, fd);
 
     rwbuf->rbuf.len = n;
-    n = sql_routine(rwbuf);
+    n = sql_routine(rwbuf, db);
     if (n == -1) {
         E("sql_routine() failed.");
         return -1;
     }
 
-    D(GREEN"send %s %d bytes from %d."NO, 
+    D(GREEN"send %s %d bytes to %d."NO, 
       rwbuf->wbuf.data, rwbuf->wbuf.len, fd);
     n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.len);
     if (n == -1) {
@@ -203,6 +204,12 @@ int cs_routine(int fd)
 
 int main(int argc, char *argv[])
 {
+    sqlite3 *db;
+    if (sqlite3_open("./cs.db", &db) != SQLITE_OK) {
+        E("sqlite3_open() failed.");
+        return -1;
+    }
+
     int ret = sockfd_list_init(1024);
     if (ret < 0) {
         E("sockfd_list_init() failed.");
@@ -267,6 +274,7 @@ int main(int argc, char *argv[])
     int n = 0;
     int i = 0;
 
+    //DIP(INADDR_ANY);
     D("cs start 0.0.0.0 %d", PORT);
     while (1) {
         rfds = rfds_g;
@@ -295,7 +303,7 @@ int main(int argc, char *argv[])
                             break;
                         }
                     } else {
-                        ret = cs_routine(i);
+                        ret = cs_routine(i, db);
                         if (ret == -1) {
                             E("cs_routine() failed.");
                             break;
@@ -313,5 +321,6 @@ int main(int argc, char *argv[])
     }
 
     close(servfd);
+    sqlite3_close(db);
     return 0;
 }

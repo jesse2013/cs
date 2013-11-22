@@ -45,8 +45,8 @@ int sql_check_name_cb(void *p, int argc, char **value, char **name)
 
 int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 {
-    if (req->name == NULL || req->passwd == NULL || db == NULL || 
-        wbuf == NULL || wbuf->data == NULL) {
+    if (req == NULL || req->name == NULL || req->passwd == NULL ||
+        db == NULL || wbuf == NULL || wbuf->data == NULL) {
         E("parameter error.");
         return -1;
     }
@@ -122,8 +122,8 @@ int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
 
 int sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 {
-    if (req->name == NULL || req->passwd == NULL || db == NULL || 
-        wbuf == NULL || wbuf->data == NULL) {
+    if (req == NULL || req->name == NULL || req->passwd == NULL ||
+        db == NULL || wbuf == NULL || wbuf->data == NULL) {
         E("parameter error.");
         return -1;
     }
@@ -178,9 +178,42 @@ int sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 }
 
 
+int sql_view_user_cb(void *p, int argc, char **value, char **name)
+{
+    buf_t *wbuf = (buf_t *)p;
+    sprintf(wbuf->data + wbuf->len, ":%s-%s", value[1], value[3]);
+    wbuf->len = strlen(wbuf->data);
+    return 0;
+}
+
 int sql_view_user(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 {
-    /* return all user */
+    if (req == NULL || db == NULL || wbuf == NULL || 
+        wbuf->data == NULL) {
+        E("parameter error.");
+        return -1;
+    }
+
+    /* check identify */
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        DPSTR(wbuf);
+        return -1;
+    }
+
+    sprintf(query_line, "select * from users");
+    DS(query_line);
+
+    int ret = sqlite3_exec(db, query_line, sql_view_user_cb, wbuf, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+    //DPSTR(wbuf);
+
+    cs_free(&query_line);
     return 0;
 }
 
@@ -301,15 +334,16 @@ cs_request_t cs_parse_request(char *buf)
     return req;
 }
 
-int sql_routine(sockfd_buf_t *rwbuf)
+int sql_routine(sockfd_buf_t *rwbuf, sqlite3 *db)
 {
     if (rwbuf == NULL || rwbuf->rbuf.data == NULL || rwbuf->rbuf.len == 0 || 
-        rwbuf->wbuf.data == NULL) {
+        rwbuf->wbuf.data == NULL || db == NULL) {
         E("parameter error.");
         DP(rwbuf);
         DP(rwbuf->rbuf.data);
         DD(rwbuf->rbuf.len);
         DP(rwbuf->wbuf.data);
+        DP(db);
         return -1;
     }
 
@@ -329,36 +363,24 @@ int sql_routine(sockfd_buf_t *rwbuf)
     cs_request_t req = cs_parse_request(rwbuf->rbuf.data);
     request_dump(&req);
 
-    sqlite3 *db;
-    if (sqlite3_open("./cs.db", &db) != SQLITE_OK) {
-        E("sqlite3_open() failed.");
-        return -1;
-    }
-
     int ret = -1;
     switch (req.req_type) {
         case 0:
-            /* register */
             ret = sql_register(&req, db, &rwbuf->wbuf);
             break;
         case 1:
-            /* login - check username & passwd */
             ret = sql_login(&req, db, &rwbuf->wbuf);
             break;
         case 2:
-            /* view all user */
             ret = sql_view_user(&req, db, &rwbuf->wbuf);
             break;
         case 3:
-            /* send content to ivy */
             ret = sql_sendto(&req, db, &rwbuf->wbuf);
             break;
         case 4:
-            /* view log with ivy */
             ret = sql_view_log(&req, db, &rwbuf->wbuf);
             break;
         case 5:
-            /* delete user */
             ret = sql_delete(&req, db, &rwbuf->wbuf);
             break;
         default:
@@ -366,6 +388,6 @@ int sql_routine(sockfd_buf_t *rwbuf)
             break;
     }
 
-    sqlite3_close(db);
+    request_free(&req);
     return ret; 
 }
