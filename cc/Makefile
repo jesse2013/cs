@@ -1,6 +1,6 @@
 app = cc
-src_d = src
-inc_d = include
+src_d = .
+inc_d = ../include
 src = $(wildcard $(src_d)/*.c)
 obj = $(patsubst %.c, %.o, $(src))
 
@@ -9,7 +9,7 @@ DFLAGS = -Wall -g -DDEBUG
 CFLAGS = -I$(inc_d) $(DFLAGS)
 
 
-$(app): $(obj)
+$(app): $(obj) ../src/cs_common.o
 	$(CC) $^ -o $@
 
 

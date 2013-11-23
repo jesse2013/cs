@@ -92,27 +92,21 @@ cs_request_t cs_parse_request(char *buf)
 
         switch (i) {
             case 0:
-                /* req_type */
                 req.req_type = atoi(token);
                 break;
             case 1:
-                /* user name */
                 req.name = strdup(token);
                 break;
             case 2:
-                /* user passwd */
                 req.passwd = strdup(token);
                 break;
             case 3:
-                /* buddy name */
                 req.buddy_name = strdup(token);
                 break;
             case 4:
-                /* content */
                 req.content = strdup(token);
                 break;
             case 5:
-                /* datatime */
                 req.datetime = strdup(token);
                 break;
             default:
@@ -180,7 +174,7 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* create private tables */
     memset(query_line, '\0', QUERY_LEN_MAX);
-    sprintf(query_line, "create table %s(id integer primary key, name text, log_name integer)", req->name);
+    sprintf(query_line, "create table %s(id integer primary key, name text, log_type integer)", req->name);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
@@ -195,16 +189,18 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     strncpy(wbuf->data, "10", 2);
     wbuf->len = 2;
 
-    D(GREEN"add user %s success.", req->name);
+    D(GREEN"register user %s success.", req->name);
     return 0;
 }
 
 
 /* user destroy */
-int sql_delete(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+int sql_destroy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 {
     /* check identify */
     /* delete user */
+    strncpy(wbuf->data, "00", 2);
+    wbuf->len = 2;
     return 0;
 }
 
@@ -219,7 +215,7 @@ int sql_check_identity_cb(void *p, int argc, char **value, char **name)
 int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
 {
     buf_t *wbuf = (buf_t *)p;
-    sprintf(wbuf->data + wbuf->len, ":%s-%s", value[1], value[2]);
+    sprintf(wbuf->data + wbuf->len, ":%s-%s", value[0], value[1]);
     wbuf->len = strlen(wbuf->data);
     return 0;
 }
@@ -272,7 +268,7 @@ int sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* get buddy name list */
     memset(query_line, '\0', QUERY_LEN_MAX);
-    sprintf(query_line, "select * from %s", req->name);
+    sprintf(query_line, "select %s.name, users.online from %s,users where %s.name=users.name;", req->name, req->name, req->name);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, wbuf, NULL);
@@ -287,6 +283,9 @@ int sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     if (wbuf->len == 0) {
         strncpy(wbuf->data, ":", 1);
         wbuf->len = 1;
+
+        cs_free(&query_line);
+        return 0;
     }
 
     cs_free(&query_line);
@@ -297,6 +296,12 @@ int sql_login(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
 
 /* logout */
+int sql_logout(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    strncpy(wbuf->data, "00", 2);
+    wbuf->len = 2;
+    return 0;
+}
 
 
 /* view all users */
@@ -343,7 +348,190 @@ int sql_view_user(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
 
 /* add buddy */
+int sql_check_relationship_cb(void *p, int argc, char **value, char **name)
+{
+    (*(int *)p)++;
+    return 0;
+}
+
+int sql_add_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    if (req == NULL || req->name == NULL || req->buddy_name == NULL ||
+        db == NULL || wbuf == NULL || wbuf->data == NULL) {
+        E("parameter error.");
+        return -1;
+    }
+
+    /* check relationship */
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        DPSTR(wbuf);
+        return -1;
+    }
+
+    sprintf(query_line, "select * from %s where name='%s'", req->name, req->buddy_name);
+    DS(query_line);
+
+    int sql_select_num = 0;
+    int ret = sqlite3_exec(db, query_line, sql_check_relationship_cb, &sql_select_num, NULL);
+    if (ret == SQLITE_OK && sql_select_num == 1) {
+        D(GREEN"%s and %s are buddy."NO, req->buddy_name, req->name);
+        cs_free(&query_line);
+
+        strncpy(wbuf->data, "12", 2);
+        wbuf->len = 2;
+        return 0;
+    }
+
+    /* update mine table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "insert into %s(name, log_type) values('%s', 0)", req->name, req->buddy_name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* update mine table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "insert into %s(name, log_type) values('%s', 1)", req->buddy_name, req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* create log table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "create table %s_%s(id integer primary key, name text, content text, datetime text)", 
+            req->name, req->buddy_name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    cs_free(&query_line);
+
+    strncpy(wbuf->data, "11", 2);
+    wbuf->len = 2;
+
+    D(GREEN"%s add buddy %s success.", req->name, req->buddy_name);
+    return 0;
+}
+
+
 /* del buddy */
+int sql_log_type_cb(void *p, int argc, char **value, char **name)
+{
+    *(int *)p = *value[2];
+    return 0;
+}
+
+int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    if (req == NULL || req->name == NULL || req->buddy_name == NULL ||
+        db == NULL || wbuf == NULL || wbuf->data == NULL) {
+        E("parameter error.");
+        return -1;
+    }
+
+    /* check relationship */
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        DPSTR(wbuf);
+        return -1;
+    }
+
+    sprintf(query_line, "select * from %s where name='%s'", req->name, req->buddy_name);
+    DS(query_line);
+
+    int sql_select_num = 0;
+    int ret = sqlite3_exec(db, query_line, sql_check_relationship_cb, &sql_select_num, NULL);
+    if (ret == SQLITE_OK && sql_select_num == 0) {
+        D(GREEN"%s and %s isn't buddy."NO, req->buddy_name, req->name);
+        cs_free(&query_line);
+
+        strncpy(wbuf->data, "12", 2);
+        wbuf->len = 2;
+        return 0;
+    }
+
+    /* update mine table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "delete from %s where name='%s'", req->name, req->buddy_name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* update mine table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "delete from %s where name='%s'", req->buddy_name, req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* check log_type */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "select * from %s where name='%s'", req->name, req->buddy_name);
+    DS(query_line);
+
+    int log_type = -1;
+    ret = sqlite3_exec(db, query_line, sql_log_type_cb, &log_type, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* delete log table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+
+    if (log_type == 0)
+        sprintf(query_line, "drop table %s_%s", req->name, req->buddy_name);
+    else if (log_type == 1)
+        sprintf(query_line, "drop table %s_%s", req->buddy_name, req->name);
+    else
+        /* undefined */
+
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret == SQLITE_ABORT) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    cs_free(&query_line);
+
+    strncpy(wbuf->data, "11", 2);
+    wbuf->len = 2;
+
+    D(GREEN"%s add buddy %s success.", req->name, req->buddy_name);
+    return 0;
+}
 
 
 /* chat with buddy */
@@ -352,17 +540,13 @@ int sql_sendto(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     /* send content to ivy */
     /* insert my log with ivy */
     /* insert ivy log with me */
+    strncpy(wbuf->data, "00", 2);
+    wbuf->len = 2;
     return 0;
 }
 
 
 /* view log */
-int sql_log_type_cb(void *p, int argc, char **value, char **name)
-{
-    *(int *)p = *value[2];
-    return 0;
-}
-
 int sql_get_log_cb(void *p, int argc, char **value, char **name)
 {
     buf_t *wbuf = (buf_t *)p;
@@ -425,6 +609,12 @@ int sql_view_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
 
 /* del log */
+int sql_del_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    strncpy(wbuf->data, "00", 2);
+    wbuf->len = 2;
+    return 0;
+}
 
 
 int sql_routine(sockfd_buf_t *rwbuf, sqlite3 *db)
@@ -462,19 +652,31 @@ int sql_routine(sockfd_buf_t *rwbuf, sqlite3 *db)
             ret = sql_register(&req, db, &rwbuf->wbuf);
             break;
         case 1:
-            ret = sql_login(&req, db, &rwbuf->wbuf);
+            ret = sql_destroy(&req, db, &rwbuf->wbuf);
             break;
         case 2:
-            ret = sql_view_user(&req, db, &rwbuf->wbuf);
+            ret = sql_login(&req, db, &rwbuf->wbuf);
             break;
         case 3:
-            ret = sql_sendto(&req, db, &rwbuf->wbuf);
+            ret = sql_logout(&req, db, &rwbuf->wbuf);
             break;
         case 4:
-            ret = sql_view_log(&req, db, &rwbuf->wbuf);
+            ret = sql_view_user(&req, db, &rwbuf->wbuf);
             break;
         case 5:
-            ret = sql_delete(&req, db, &rwbuf->wbuf);
+            ret = sql_add_buddy(&req, db, &rwbuf->wbuf);
+            break;
+        case 6:
+            ret = sql_del_buddy(&req, db, &rwbuf->wbuf);
+            break;
+        case 7:
+            ret = sql_sendto(&req, db, &rwbuf->wbuf);
+            break;
+        case 8:
+            ret = sql_view_log(&req, db, &rwbuf->wbuf);
+            break;
+        case 9:
+            ret = sql_del_log(&req, db, &rwbuf->wbuf);
             break;
         default:
             DD(req.req_type);

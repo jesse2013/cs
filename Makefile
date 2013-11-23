@@ -1,6 +1,7 @@
 app = cs
 src_d = src
 inc_d = include
+db_d = db
 src = $(wildcard $(src_d)/*.c)
 obj = $(patsubst %.c, %.o, $(src))
 
@@ -33,9 +34,7 @@ endif
 client:
 	@cd cc && make
 sql:
-	-rm cs.db
-	@sqlite3 cs.db < cs.sql
-	@echo "new cs.db create"
+	@cd db && make
 clean:
 	-rm $(src_d)/*.o $(src_d)/*.d $(app)
 	@cd cc && make clean
