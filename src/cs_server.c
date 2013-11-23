@@ -32,6 +32,7 @@ int sockfd_list_init(int n)
     
 }
 
+
 void register_readfd(int fd)
 {
     FD_SET(fd, &rfds_g);
@@ -39,6 +40,7 @@ void register_readfd(int fd)
     if (maxfd < fd)
         maxfd = fd;
 }
+
 void register_writefd(int fd)
 {
     FD_SET(fd, &wfds_g);
@@ -46,6 +48,7 @@ void register_writefd(int fd)
     if (maxfd < fd)
         maxfd = fd;
 }
+
 void register_exceptfd(int fd)
 {
     FD_SET(fd, &efds_g);
@@ -58,10 +61,12 @@ void unregister_readfd(int fd)
 {
     FD_CLR(fd, &rfds_g);
 }
+
 void unregister_writefd(int fd)
 {
     FD_CLR(fd, &wfds_g);
 }
+
 void unregister_exceptfd(int fd)
 {
     FD_CLR(fd, &efds_g);
