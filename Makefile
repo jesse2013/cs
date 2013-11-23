@@ -29,9 +29,13 @@ endif
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 
-.PHONY: client clean
+.PHONY: client sql clean
 client:
 	@cd cc && make
+sql:
+	-rm cs.db
+	@sqlite3 cs.db < cs.sql
+	@echo "new cs.db create"
 clean:
 	-rm $(src_d)/*.o $(src_d)/*.d $(app)
 	@cd cc && make clean
