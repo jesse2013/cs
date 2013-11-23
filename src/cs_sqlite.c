@@ -162,7 +162,7 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* insert user info to users table */
     memset(query_line, '\0', QUERY_LEN_MAX);
-    sprintf(query_line, "insert into users(name, passwd, online) values('%s', '%s', 'off')", req->name, req->passwd);
+    sprintf(query_line, "insert into users(name, passwd, online, fd) values('%s', '%s', 'off', -1)", req->name, req->passwd);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
@@ -340,9 +340,19 @@ int sql_view_user(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     }
     //DPSTR(wbuf);
 
+    /* user haven't buddy */
+    if (wbuf->len == 0) {
+        strncpy(wbuf->data, ":", 1);
+        wbuf->len = 1;
+
+        cs_free(&query_line);
+        D(YELLOW"nothing in users table."NO);
+        return 0;
+    }
+
     cs_free(&query_line);
 
-    D(GREEN"view all users success.");
+    D(GREEN"view all users success."NO);
     return 0;
 }
 
@@ -529,7 +539,7 @@ int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     strncpy(wbuf->data, "11", 2);
     wbuf->len = 2;
 
-    D(GREEN"%s add buddy %s success.", req->name, req->buddy_name);
+    D(GREEN"%s delete buddy %s success.", req->name, req->buddy_name);
     return 0;
 }
 

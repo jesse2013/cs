@@ -210,7 +210,7 @@ int cs_routine(int fd, sqlite3 *db)
 int main(int argc, char *argv[])
 {
     sqlite3 *db;
-    if (sqlite3_open("./cs.db", &db) != SQLITE_OK) {
+    if (sqlite3_open("db/cs.db", &db) != SQLITE_OK) {
         E("sqlite3_open() failed.");
         return -1;
     }
