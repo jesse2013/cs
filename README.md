@@ -123,7 +123,9 @@ client的请求
 
 删除好友		:6:troy:_:ivy::
 
-与好友聊天		:7:troy:_:ivy:nihao:
+与好友聊天		:7:troy:_:zyy:nihao,zyy:20131117100404
+
+				:7:zyy:_:troy:nihao,troy:20131117100404
 
 查看聊天记录	:8:troy:_:ivy::
 
@@ -141,6 +143,8 @@ server的回应
 12	用户名已存在
 
 13	此用户不存在
+
+......
 
 
 数据库(cs.db)设计
