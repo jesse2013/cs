@@ -24,7 +24,8 @@ typedef struct {
 } cs_request_t;
 
 
-int sql_routine(sockfd_buf_t *rwbuf, sqlite3 *db);
+int sql_routine(int fd, sqlite3 *db, cs_request_t *req, sockfd_buf_t *rwbuf);
+int sql_find_buddy_fd(cs_request_t *req, sqlite3 *db);
 
 
 #endif /* _CS_SQLITE_H_INCLUDED_ */
