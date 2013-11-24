@@ -109,32 +109,30 @@ linux / windows / android / ios
 ==============================================
 client的请求
 
-注册用户		:0:troy:troy:::
+ok 注册用户		:0:troy:troy:::
 
 销毁用户		:1:::::
 
-登陆			:2:troy:troy:::
+ok 登陆			:2:troy:troy:::
 
 退出			:3:::::
 
-查看所有用户	:4:::::
+ok 查看所有用户	:4:::::
 
-添加好友		:5:troy:_:ivy::
+ok 添加好友		:5:troy:_:ivy::
 
-删除好友		:6:troy:_:ivy::
+ok 删除好友		:6:troy:_:ivy::
 
-与好友聊天		:7:troy:_:zyy:nihao,zyy:20131117100404
+ok 与好友聊天	:7:troy:_:zyy:nihao,zyy:20131117100404
 
-				:7:zyy:_:troy:nihao,troy:20131117100404
-
-查看聊天记录	:8:troy:_:ivy::
+ok查看聊天记录	:8:troy:_:zyy::
 
 删除聊天记录	:9:troy:_:ivy::
 
 
 server的回应
 
-10	未知请求类型
+00	未知请求类型
 
 10	成功(转为登录状态)
 
@@ -153,27 +151,25 @@ server的回应
 
 create table users(id integer primary key, name text, passwd text, online text, fd integer);
 
-insert into users(name, passwd, online, fd) values('root', 'root', 'off', -1);
-
 insert into users(name, passwd, online, fd) values('troy', 'troy', 'off', -1);
+
+insert into users(name, passwd, online, fd) values('zyy', 'zyy', 'off', -1);
 
 2.表名为用户名 此用户的所有好友
 
 create table troy(id integer primary key, name text, log_type integer);
 
-insert into troy(name, log_type) values('ivy', -1);
+insert into troy(name, log_type) values('zyy', 0);
 
-insert into troy(name, log_type) values('cy', -1);
-
-insert into troy(name, log_type) values('jdy', -1);
+insert into zyy(name, log_type) values('troy', 1);
 
 3.表名为用户名-好友用户名 存放聊天记录
 
-create table troy_ivy(id integer primary key, name text, content text, datetime text);
+create table troy_zyy(id integer primary key, name text, content text, datetime text);
 
-insert into troy_ivy(name, content, datetime) values('ivy', 'hello,ivy', '20131117100404');
+insert into troy_zyy(name, content, datetime) values('troy', 'hello,ivy', '20131117100404');
 
-insert into troy_ivy(name, content, datetime) values('troy', 'hello,troy', '20131117100504');
+insert into troy_zyy(name, content, datetime) values('zyy', 'hello,troy', '20131117100504');
 
 
 表操作
@@ -215,14 +211,14 @@ root@cs# make sql	/*初始化数据库*/
 
 root@cs# make
 
-root@cs# ./cs       /* default port: 8888 */
+root@cs# ./cs       /* start cs, default port: 8888 */
+
+[11.00:35:38.723]:cs->src/cs_server.c->main:00285 --> cs start 0.0.0.0 8888
 
 root@cs# ./cc/cc
 
-[8.16:39:21.476]:cc->src/cc_client.c->main:00044 --> connect 127.0.0.1 at PORT 8888 success.
+[11.00:51:13.362]:cc->cc_client.c->main:00071 --> connect 127.0.0.1 at PORT 8888 success.
 
-:0:troy:troy:::		/* 注册新用户 */
+[11.00:51:13.363]:cc->cc_client.c->receive_routine:00010 --> *****receive_routine() Enter*****
 
-[8.16:39:25.779]:cc->src/cc_client.c->main:00056 --> buf=:1:troy:troy:::
-
-[8.16:39:25.783]:cc->src/cc_client.c->main:00072 --> buf=:ivy-on:cy-off:jdy-on
+:0:guest:guest:::		/* 注册新用户 */

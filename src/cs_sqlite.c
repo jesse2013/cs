@@ -79,7 +79,7 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -91,7 +91,7 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -156,7 +156,7 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     int sql_select_num = 0;
     int ret = sqlite3_exec(db, query_line, sql_check_identity_cb, 
                 &sql_select_num, NULL);
-    if (ret == SQLITE_ABORT || sql_select_num != 1) {
+    if (ret != SQLITE_OK || sql_select_num != 1) {
         /* no this user & passwd */
         E("sqlite3_exec() failed.");
         DD(sql_select_num);
@@ -173,7 +173,7 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -185,7 +185,7 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, wbuf, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -246,7 +246,7 @@ int sql_view_user(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     int ret = sqlite3_exec(db, query_line, sql_view_user_cb, wbuf, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -313,7 +313,7 @@ int sql_add_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -325,7 +325,7 @@ int sql_add_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -338,7 +338,7 @@ int sql_add_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -397,7 +397,7 @@ int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -409,7 +409,7 @@ int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -422,7 +422,7 @@ int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     int log_type = -1;
     ret = sqlite3_exec(db, query_line, sql_log_type_cb, &log_type, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -430,18 +430,16 @@ int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* delete log table */
     memset(query_line, '\0', QUERY_LEN_MAX);
-
     if (log_type == 0)
         sprintf(query_line, "drop table %s_%s", req->name, req->buddy_name);
     else if (log_type == 1)
         sprintf(query_line, "drop table %s_%s", req->buddy_name, req->name);
     else
-        /* undefined */
-
+        DD(log_type);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -458,7 +456,6 @@ int sql_del_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
 
 /* chat with buddy */
-/* use buddy name get buddy fd */
 int sql_buddy_fd_cb(void *p, int argc, char **value, char **name)
 {
     *(int *)p = atoi(value[3]);
@@ -485,7 +482,7 @@ int sql_find_buddy_fd(cs_request_t *req, sqlite3 *db)
 
     int fd = 0;
     int ret = sqlite3_exec(db, query_line, sql_buddy_fd_cb, &fd, NULL);
-    if (ret == SQLITE_ABORT || fd < 0) {
+    if (ret != SQLITE_OK || fd < 0) {
         E("sqlite3_exec() failed.");
         DD(fd);
         cs_free(&query_line);
@@ -531,15 +528,46 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     /* check log_type */
     int log_type = -1;
     ret = sqlite3_exec(db, query_line, sql_log_type_cb, &log_type, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
     }
 
+    /* check log table whether exist */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    if (log_type == 0)
+        sprintf(query_line, "select * from %s_%s",
+                req->name, req->buddy_name);
+    else if (log_type == 1)
+        sprintf(query_line, "select * from %s_%s",
+                req->buddy_name, req->name);
+    else
+        DD(log_type);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret != SQLITE_OK) {
+        /* the table isn't exist, create it */
+        memset(query_line, '\0', QUERY_LEN_MAX);
+        if (log_type == 0)
+            sprintf(query_line, "create table %s_%s(id integer primary key, name text, content text, datetime text)", 
+                    req->name, req->buddy_name);
+        else
+            sprintf(query_line, "create table %s_%s(id integer primary key, name text, content text, datetime text)", 
+                    req->buddy_name, req->name);
+        DS(query_line);
+
+        ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+        if (ret != SQLITE_OK) {
+            E("sqlite3_exec() failed.");
+            cs_free(&query_line);
+            return -1;
+        }
+    }
+
     /* update log table */
     memset(query_line, '\0', QUERY_LEN_MAX);
-
     if (log_type == 0)
         sprintf(query_line, "insert into %s_%s(name, content, datetime) values('%s', '%s', '%s')", 
                 req->name, req->buddy_name, req->name, req->content, req->datetime);
@@ -548,11 +576,10 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
                 req->buddy_name, req->name, req->name, req->content, req->datetime);
     else
         DD(log_type);
-
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
         cs_free(&query_line);
         return -1;
@@ -590,6 +617,7 @@ int sql_get_log_cb(void *p, int argc, char **value, char **name)
     buf_t *wbuf = (buf_t *)p;
     sprintf(wbuf->data + wbuf->len, ":%s-%s-%s", value[1], value[3], value[2]);
     wbuf->len = strlen(wbuf->data);
+    DPSTR(wbuf);
     return 0;
 }
 
@@ -614,27 +642,31 @@ int sql_view_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     int log_type = -1;
     int ret = sqlite3_exec(db, query_line, sql_log_type_cb, &log_type, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
+        DD(log_type);
         cs_free(&query_line);
         return -1;
     }
     
     /* get log content */
     memset(query_line, '\0', QUERY_LEN_MAX);
-
     if (log_type == 0)
-        sprintf(query_line, "select * from %s-%s", req->name, req->buddy_name);
+        sprintf(query_line, "select * from %s_%s", req->name, req->buddy_name);
     else if (log_type == 1)
-        sprintf(query_line, "select * from %s-%s", req->buddy_name, req->name);
+        sprintf(query_line, "select * from %s_%s", req->buddy_name, req->name);
     else
-        /* undefined */
-
+        DD(log_type);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, sql_get_log_cb, wbuf, NULL);
-    if (ret == SQLITE_ABORT) {
+    if (ret != SQLITE_OK) {
         E("sqlite3_exec() failed.");
+        E("the log table isn't exist.");
+
+        strncpy(wbuf->data, "00", 2);
+        wbuf->len = 2;
+
         cs_free(&query_line);
         return -1;
     }
