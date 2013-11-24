@@ -529,10 +529,6 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     }
 
     /* check log_type */
-    memset(query_line, '\0', QUERY_LEN_MAX);
-    sprintf(query_line, "select * from %s where name='%s'", req->name, req->buddy_name);
-    DS(query_line);
-
     int log_type = -1;
     ret = sqlite3_exec(db, query_line, sql_log_type_cb, &log_type, NULL);
     if (ret == SQLITE_ABORT) {
