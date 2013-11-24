@@ -153,124 +153,6 @@ int cs_accept(int servfd)
 }
 
 
-int cs_regex(const char *str, const char *regex)
-{
-    if (str == NULL || regex == NULL) { 
-        E("parameter error."); 
-        return -1;  
-    }    
-
-    regex_t preg;
-    int ret = -1;
-    ret = regcomp(&preg, regex, REG_EXTENDED);
-    if (ret != 0) { 
-        E("regcomp() failed."); 
-        return -1;  
-    }    
-
-    size_t nmatch = 2; 
-    regmatch_t pmatch[2];
-    ret = regexec(&preg, str, nmatch, pmatch, 0);
-    if (ret != 0) { 
-        E("regexec() failed."); 
-        regfree(&preg); 
-        return -1;  
-    }    
-
-    regfree(&preg);
-    return ret; 
-}
-
-
-void request_init(cs_request_t *req)
-{
-    req->req_type = -1;
-    req->name = NULL;
-    req->passwd = NULL;
-    req->buddy_name = NULL;
-    req->content = NULL;
-    req->datetime = NULL;
-}
-
-void request_dump(cs_request_t *req)
-{
-    D("***********************************");
-    DD(req->req_type);
-    DSIF(req->name);
-    DSIF(req->passwd);
-    DSIF(req->buddy_name);
-    DSIF(req->content);
-    DSIF(req->datetime);
-    D("***********************************");
-}
-
-void request_free(cs_request_t *req)
-{
-    cs_free(&req->name);
-    cs_free(&req->passwd);
-    cs_free(&req->buddy_name);
-    cs_free(&req->content);
-    cs_free(&req->datetime);
-}
-
-cs_request_t cs_parse_request(char *buf)
-{
-    cs_request_t req;
-    request_init(&req);
-
-    if (buf == NULL) {
-        E("parameter error.");
-        return req;
-    }
-
-    char *buf_copy = strdup(buf);
-    if (buf_copy == NULL) {
-        E("strncup() failed.");
-        return req;
-    }
-
-    char *str = buf_copy;
-    char *token = NULL;
-    char *saveptr = NULL;
-    int i = 0;
-    while (1) {
-        token = strtok_r(str, ":", &saveptr);
-        if (token == NULL)
-            break;
-
-        switch (i) {
-            case 0:
-                req.req_type = atoi(token);
-                break;
-            case 1:
-                req.name = strdup(token);
-                break;
-            case 2:
-                req.passwd = strdup(token);
-                break;
-            case 3:
-                req.buddy_name = strdup(token);
-                break;
-            case 4:
-                req.content = strdup(token);
-                break;
-            case 5:
-                req.datetime = strdup(token);
-                break;
-            default:
-                DD(i);
-                break;
-        }
-
-        str = NULL;
-        i++;
-    }
-    //request_dump(&req);
-
-    cs_free(&buf_copy);
-    return req;
-}
-
 int cs_routine(int fd, sqlite3 *db)
 {
     sockfd_buf_t *rwbuf = sockfd_list[fd];
@@ -303,45 +185,10 @@ int cs_routine(int fd, sqlite3 *db)
       rwbuf->rbuf.data, n, fd);
     rwbuf->rbuf.len = n;
 
-    int buddy_fd = -1;
-
-    /* :0:name:passwd:name:content:datetime */
-    char *regex = "^:[0-9]{1}:[A-Za-z0-9_]*:[A-Za-z0-9_]*:"
-                    "[A-Za-z0-9_]*:.*:[0-9]{0,14}$";
-    if (cs_regex(rwbuf->rbuf.data, regex) != 0) {
-        E("request type undefined.");
-
-        strncpy(rwbuf->wbuf.data, "00", 2);
-        rwbuf->wbuf.len = 2;
-    } else {
-        cs_request_t req = cs_parse_request(rwbuf->rbuf.data);
-        request_dump(&req);
-
-        if (req.req_type == 7) {
-            buddy_fd = sql_find_buddy_fd(&req, db);
-
-            n = write(buddy_fd, req.content, strlen(req.content));
-            if (n == -1) {
-                E(RED"%d send %s to %d failed."NO, fd, req.content, buddy_fd);
-                E("%s", strerror(errno));
-
-                strncpy(rwbuf->wbuf.data, "err", 3);
-                rwbuf->wbuf.len = 3;
-            } else {
-                D(RED"%d send %s to %d success."NO, fd, req.content, buddy_fd);
-
-                strncpy(rwbuf->wbuf.data, "ok", 2);
-                rwbuf->wbuf.len = 2;
-            }
-        } else {
-            n = sql_routine(fd, db, &req, rwbuf);
-            if (n == -1) {
-                E("sql_routine() failed.");
-                return -1;
-            }
-        }
-
-        request_free(&req);
+    n = sql_routine(fd, db, rwbuf);
+    if (n == -1) {
+        E("sql_routine() failed.");
+        return -1;
     }
 
     D(GREEN"send %s %d bytes to %d."NO, 
