@@ -357,7 +357,7 @@ int sql_add_buddy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 /* del buddy */
 int sql_log_type_cb(void *p, int argc, char **value, char **name)
 {
-    *(int *)p = *value[2];
+    *(int *)p = atoi(value[2]);
     return 0;
 }
 
@@ -551,7 +551,7 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         sprintf(query_line, "insert into %s_%s(name, content, datetime) values('%s', '%s', '%s')", 
                 req->buddy_name, req->name, req->name, req->content, req->datetime);
     else
-        /* undefined */
+        DD(log_type);
 
     DS(query_line);
 

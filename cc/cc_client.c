@@ -5,18 +5,46 @@
 #include "cc_client.h"
 
 
+void *receive_routine(void *p)
+{
+    DFE;
+    if (p == NULL) {
+        E("parameter error.");
+        pthread_exit((void *)0);
+    }
+    int fd = *(int *)p;
+
+	size_t bl = 512;
+	char *b = (char *)cs_malloc(sizeof(char) * bl);
+	if (b == NULL) {
+		E("cs_malloc() failed.");
+        pthread_exit((void *)0);
+        return NULL;
+	}
+
+	ssize_t s = 0;
+    while (1) {
+        s = read(fd, b, bl);
+        if (s < 0) {
+            E("%s", strerror(errno));
+            cs_free(&b);
+            return NULL;
+        } else if (s == 0) {
+            D("server is closed."); 
+            cs_free(&b);
+            pthread_exit((void *)0);
+            return NULL;
+        }
+
+        D(GREEN"receive %s %d bytes."NO, b, strlen(b));
+		memset(b, '\0', bl);
+    }
+    DFL;
+}
+
+
 int main(int argc, char *argv[])
 {
-#if 0
-    :troy:troy:20131117100404:ivy:hello.
-    client向server发送的请求类型
-    :0:name:passwd:20131117100404           //注册
-    :1:name:passwd:20131117100404           //登录
-    :2:20131117100404               //查看所有用户
-    :3:ivy:20131117100404:hello world.      //发送聊天消息
-    :4:ivy                      //查看聊天记录
-#endif
-
 	int sockfd = -1;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == -1) {
@@ -49,10 +77,12 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+    pthread_t thread;
+    ret = pthread_create(&thread, NULL, receive_routine, &sockfd);
+
 	ssize_t s = 0;
 	while (1) {
         scanf("%s", buf);
-        D(GREEN"send %s %d bytes."NO, buf, strlen(buf));
 
 		s = write(sockfd, buf, strlen(buf));
 		if (s == -1) {
@@ -60,21 +90,12 @@ int main(int argc, char *argv[])
 			cs_free(&buf);
 			return -1;
 		}
-		memset(buf, '\0', buflen);
+        D(GREEN"send %s %d bytes."NO, buf, strlen(buf));
 
-		s = read(sockfd, buf, buflen);
-		if (s < 0) {
-			E("%s", strerror(errno));
-			cs_free(&buf);
-			return -1;
-		} else if (s == 0) {
-            D("server is closed."); 
-            return -1;
-        }
-        D(GREEN"receive %s %d bytes."NO, buf, strlen(buf));
-		memset(buf, '\0', buflen);
+        memset(buf, '\0', buflen);
 	}
 
+    pthread_join(thread, NULL);
 	cs_free(&buf);
 
 	ret = close(sockfd);

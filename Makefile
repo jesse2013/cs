@@ -15,6 +15,7 @@ $(app): $(obj) client
 
 
 ifneq ($(MAKECMDGOALS), clean)
+ifneq ($(MAKECMDGOALS), sql)
 sinclude $(src:.c=.d)
 
 %.d: %.c
@@ -23,6 +24,7 @@ sinclude $(src:.c=.d)
 	$(CC) -MM $(CFLAGS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[:]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
+endif
 endif
 
 
