@@ -191,6 +191,9 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
     //DPSTR(wbuf);
+    
+    /* get message when offline receive */
+    // FIXME: code
 
     /* user haven't buddy */
     if (wbuf->len == 0) {
@@ -652,6 +655,14 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* sendto buddy fd */
     int buddy_fd = sql_find_buddy_fd(req, db);
+    if (buddy_fd < 0) {
+        strncpy(wbuf->data, "88", 2);
+        wbuf->len = 2;
+
+        cs_free(&query_line);
+        E("%s is offline, he/she will see the message when login.", req->buddy_name)
+        return 0;
+    }
 
     ret = write(buddy_fd, req->content, strlen(req->content));
     if (ret == -1) {
