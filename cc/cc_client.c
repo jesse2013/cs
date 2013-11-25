@@ -36,7 +36,7 @@ void *receive_routine(void *p)
             return NULL;
         }
 
-        D(GREEN"receive %s %d bytes."NO, b, strlen(b));
+        D(GREEN"receive %s %ld bytes."NO, b, strlen(b));
 		memset(b, '\0', bl);
     }
     DFL;
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 			cs_free(&buf);
 			return -1;
 		}
-        D(GREEN"send %s %d bytes."NO, buf, strlen(buf));
+        D(GREEN"send %s %ld bytes."NO, buf, strlen(buf));
 
         memset(buf, '\0', buflen);
 	}
