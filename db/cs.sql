@@ -6,3 +6,5 @@ insert into troy(name, log_type) values('zyy', 0);
 create table zyy(id integer primary key, name text, log_type integer);
 insert into zyy(name, log_type) values('troy', 1);
 create table troy_zyy(id integer primary key, name text, content text, datetime text);
+create table troy_offline(id integer primary key, name text, content text, datetime text);
+create table zyy_offline(id integer primary key, name text, content text, datetime text);

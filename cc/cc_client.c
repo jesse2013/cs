@@ -36,7 +36,7 @@ void *receive_routine(void *p)
             return NULL;
         }
 
-        D(GREEN"receive %s %ld bytes."NO, b, strlen(b));
+        D(GREEN"receive %s %ld bytes."NO, b, (long int)strlen(b));
 		memset(b, '\0', bl);
     }
     DFL;
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 			cs_free(&buf);
 			return -1;
 		}
-        D(GREEN"send %s %ld bytes."NO, buf, strlen(buf));
+        D(GREEN"send %s %ld bytes."NO, buf, (long int)strlen(buf));
 
         if (strncasecmp(buf, ":3:", 3) == 0) {
             //if (pthread_kill(thread, SIGINT) != 0)

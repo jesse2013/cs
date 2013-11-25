@@ -97,6 +97,19 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
+    /* create private offline table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "create table %s_offline(id integer primary key, name text, content text, datetime text)", 
+            req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
     cs_free(&query_line);
 
     strncpy(wbuf->data, "10", 2);
@@ -130,6 +143,15 @@ int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
     buf_t *wbuf = (buf_t *)p;
     sprintf(wbuf->data + wbuf->len, ":%s-%s", value[0], value[1]);
     wbuf->len = strlen(wbuf->data);
+    return 0;
+}
+
+int sql_offline_message_cb(void *p, int argc, char **value, char **name)
+{
+    buf_t *wbuf = (buf_t *)p;
+    sprintf(wbuf->data + wbuf->len, ":%s-%s-%s", value[1], value[3], value[2]);
+    wbuf->len = strlen(wbuf->data);
+    DPSTR(wbuf);
     return 0;
 }
 
@@ -181,7 +203,7 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* get buddy name list */
     memset(query_line, '\0', QUERY_LEN_MAX);
-    sprintf(query_line, "select %s.name, users.fd from %s,users where %s.name=users.name;", req->name, req->name, req->name);
+    sprintf(query_line, "select %s.name, users.fd from %s,users where %s.name=users.name", req->name, req->name, req->name);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, sql_get_buddy_cb, wbuf, NULL);
@@ -190,12 +212,38 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         cs_free(&query_line);
         return -1;
     }
-    //DPSTR(wbuf);
-    
-    /* get message when offline receive */
-    // FIXME: code
+    DPSTR(wbuf);
 
-    /* user haven't buddy */
+    strncpy(wbuf->data + wbuf->len, "*", 1);
+    wbuf->len += 1;
+    DPSTR(wbuf);
+    
+    /* get offline table message */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "select * from %s_offline", req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, sql_offline_message_cb, wbuf, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+    DPSTR(wbuf);
+
+    /* empty offline table message */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "delete from %s_offline", req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* haven't buddy and offline message */
     if (wbuf->len == 0) {
         strncpy(wbuf->data, ":", 1);
         wbuf->len = 1;
@@ -216,17 +264,20 @@ int sql_notice_buddy_cb(void *p, int argc, char **value, char **name)
 {
     char *n = (char *)p;
     int buddy_fd = atoi(value[1]);
-    char line[512] = {'\0'};
 
+    char line[512] = {'\0'};
     sprintf(line, ":99:%s", n);
     DS(line);
 
-    int ret = write(buddy_fd, line, strlen(line));
-    if (ret == -1) {
-        E(YELLOW"send %s quit info to client %d failed."NO, n, buddy_fd);
-        E("%s", strerror(errno));
-    } else {
-        D(YELLOW"send %s quit info to client %d success."NO, n, buddy_fd);
+    int ret = -1;
+    if (buddy_fd >= 0) {
+        ret = write(buddy_fd, line, strlen(line));
+        if (ret == -1) {
+            E(YELLOW"send %s quit info to client %d failed."NO, n, buddy_fd);
+            E("%s", strerror(errno));
+        } else {
+            D(YELLOW"send %s quit info to client %d success."NO, n, buddy_fd);
+        }
     }
 
     return 0;
@@ -246,9 +297,6 @@ int sql_logout(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
-    /* find mine fd, free mem and close fd */
-    // FIXME: use server.c l171 (n == 0) 
-
     /* update user info in users table */
     sprintf(query_line, "update users set fd=-1 where name='%s'", req->name);
     DS(query_line);
@@ -262,7 +310,7 @@ int sql_logout(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
     /* notice all buddy */
     memset(query_line, '\0', QUERY_LEN_MAX);
-    sprintf(query_line, "select %s.name, users.fd from %s,users where %s.name=users.name;", req->name, req->name, req->name);
+    sprintf(query_line, "select %s.name, users.fd from %s,users where %s.name=users.name", req->name, req->name, req->name);
     DS(query_line);
 
     ret = sqlite3_exec(db, query_line, sql_notice_buddy_cb, req->name, NULL);
@@ -272,15 +320,17 @@ int sql_logout(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
-    // FIXME: if else
-    //strncpy(wbuf->data, "err", 3);
-    //wbuf->len = 3;
     strncpy(wbuf->data, "ok", 2);
     wbuf->len = 2;
 
     cs_free(&query_line);
 
-    //D(GREEN"user %s logout success.", req->name);
+    /* 
+     * find mine fd, fd_clr and close fd.
+     * free mine wrbuf
+     * on L171 cs_server.c where n == 0
+     */
+
     return 0;
 }
 
@@ -602,14 +652,13 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
+#if 0
     /* check log table whether exist */
     memset(query_line, '\0', QUERY_LEN_MAX);
     if (log_type == 0)
-        sprintf(query_line, "select * from %s_%s",
-                req->name, req->buddy_name);
+        sprintf(query_line, "select * from %s_%s", req->name, req->buddy_name);
     else if (log_type == 1)
-        sprintf(query_line, "select * from %s_%s",
-                req->buddy_name, req->name);
+        sprintf(query_line, "select * from %s_%s", req->buddy_name, req->name);
     else
         DD(log_type);
     DS(query_line);
@@ -633,6 +682,7 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
             return -1;
         }
     }
+#endif
 
     /* update log table */
     memset(query_line, '\0', QUERY_LEN_MAX);
@@ -656,11 +706,25 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     /* sendto buddy fd */
     int buddy_fd = sql_find_buddy_fd(req, db);
     if (buddy_fd < 0) {
+        /* buddy offline, sendto message to buddy_offline table */
+        memset(query_line, '\0', QUERY_LEN_MAX);
+        sprintf(query_line, "insert into %s_offline(name, content, datetime) values('%s', '%s', '%s')", 
+                req->buddy_name, req->name, req->content, req->datetime);
+        DS(query_line);
+
+        ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+        if (ret != SQLITE_OK) {
+            E("sqlite3_exec() failed.");
+            cs_free(&query_line);
+            return -1;
+        }
+
+        E("%s is offline, he/she will see the message when login.", req->buddy_name)
+
         strncpy(wbuf->data, "88", 2);
         wbuf->len = 2;
 
         cs_free(&query_line);
-        E("%s is offline, he/she will see the message when login.", req->buddy_name)
         return 0;
     }
 
@@ -679,9 +743,6 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     }
 
     cs_free(&query_line);
-
-    //wbuf->len = strlen(req->content);
-    //strncpy(wbuf->data, req->content, wbuf->len);
 
     return 0;
 }
@@ -767,8 +828,55 @@ int sql_view_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 /* del log */
 int sql_del_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 {
-    strncpy(wbuf->data, "00", 2);
+    if (req == NULL || req->name == NULL || req->buddy_name == NULL ||
+        db == NULL || wbuf == NULL || wbuf->data == NULL) {
+        E("parameter error.");
+        return -1;
+    }
+
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        DPSTR(wbuf);
+        return -1;
+    }
+
+    /* check log_type */
+    sprintf(query_line, "select * from %s where name='%s'", req->name, req->buddy_name);
+    DS(query_line);
+
+    int log_type = -1;
+    int ret = sqlite3_exec(db, query_line, sql_log_type_cb, &log_type, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        DD(log_type);
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* empty offline table message */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    if (log_type == 0)
+        sprintf(query_line, "delete from %s_%s", req->name, req->buddy_name);
+    else if (log_type == 1)
+        sprintf(query_line, "delete from %s_%s", req->buddy_name, req->name);
+    else
+        DD(log_type);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    strncpy(wbuf->data, "ok", 2);
     wbuf->len = 2;
+
+    cs_free(&query_line);
+
+    D(GREEN"clear log with %s success.", req->buddy_name);
     return 0;
 }
 
