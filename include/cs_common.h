@@ -34,6 +34,7 @@
 #include <math.h> // -lm
 #include <pthread.h> // -lpthread
 #include <regex.h>
+#include <signal.h>
 
 
 typedef struct {

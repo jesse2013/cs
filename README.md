@@ -115,7 +115,7 @@ ok 注册用户		:0:troy:troy:::
 
 ok 登陆			:2:troy:troy:::
 
-退出			:3:::::
+ok 退出			:3:::::
 
 ok 查看所有用户	:4:::::
 
@@ -125,7 +125,7 @@ ok 删除好友		:6:troy:_:ivy::
 
 ok 与好友聊天	:7:troy:_:zyy:nihao,zyy:20131117100404
 
-ok查看聊天记录	:8:troy:_:zyy::
+ok 查看聊天记录	:8:troy:_:zyy::
 
 删除聊天记录	:9:troy:_:ivy::
 
@@ -207,7 +207,7 @@ yum install sqlite.i686
 
 how to use?
 ==============================================
-root@cs# make sql	/*初始化数据库*/
+root@cs# make sql	/* 初始化数据库 */
 
 root@cs# make
 

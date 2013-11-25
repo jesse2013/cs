@@ -176,8 +176,8 @@ int cs_routine(int fd, sqlite3 *db)
         unregister_writefd(fd);
         unregister_exceptfd(fd);
 
-        D(GREEN"client %d is closed."NO, fd);
         close(fd);
+        D(GREEN"close %d client success."NO, fd);
         return 0;
     }
 

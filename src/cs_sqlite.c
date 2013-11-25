@@ -209,10 +209,75 @@ int sql_login(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
 
 /* logout */
+int sql_notice_buddy_cb(void *p, int argc, char **value, char **name)
+{
+    char *n = (char *)p;
+    int buddy_fd = atoi(value[1]);
+    char line[512] = {'\0'};
+
+    sprintf(line, ":99:%s", n);
+    DS(line);
+
+    int ret = write(buddy_fd, line, strlen(line));
+    if (ret == -1) {
+        E(YELLOW"send %s quit info to client %d failed."NO, n, buddy_fd);
+        E("%s", strerror(errno));
+    } else {
+        D(YELLOW"send %s quit info to client %d success."NO, n, buddy_fd);
+    }
+
+    return 0;
+}
+
 int sql_logout(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 {
-    strncpy(wbuf->data, "00", 2);
+    if (req == NULL || db == NULL || wbuf == NULL || wbuf->data == NULL) {
+        E("parameter error.");
+        return -1;
+    }
+
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        DPSTR(wbuf);
+        return -1;
+    }
+
+    /* find mine fd, free mem and close fd */
+    // FIXME: use server.c l171 (n == 0) 
+
+    /* update user info in users table */
+    sprintf(query_line, "update users set fd=-1 where name='%s'", req->name);
+    DS(query_line);
+
+    int ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* notice all buddy */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "select %s.name, users.fd from %s,users where %s.name=users.name;", req->name, req->name, req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, sql_notice_buddy_cb, req->name, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    // FIXME: if else
+    //strncpy(wbuf->data, "err", 3);
+    //wbuf->len = 3;
+    strncpy(wbuf->data, "ok", 2);
     wbuf->len = 2;
+
+    cs_free(&query_line);
+
+    //D(GREEN"user %s logout success.", req->name);
     return 0;
 }
 
@@ -503,7 +568,6 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
-    /* check relationship */
     char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
     if (query_line == NULL) {
         E("cs_malloc() failed.");
@@ -511,6 +575,7 @@ int sql_sendto(int fd, cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
+    /* check relationship */
     sprintf(query_line, "select * from %s where name='%s'", req->name, req->buddy_name);
     DS(query_line);
 
@@ -671,9 +736,19 @@ int sql_view_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
         return -1;
     }
 
+    if (wbuf->len == 0) {
+        strncpy(wbuf->data, ":99:nolog", 9);
+        wbuf->len = 9;
+    }
+
     cs_free(&query_line);
 
-    D(GREEN"view log %s-%s success.", req->name, req->buddy_name);
+    if (log_type == 0) {
+        D(GREEN"view log %s-%s success.", req->name, req->buddy_name);
+    } else {
+        D(GREEN"view log %s-%s success.", req->buddy_name, req->name);
+    }
+
     return 0;
 }
 

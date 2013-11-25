@@ -92,6 +92,17 @@ int main(int argc, char *argv[])
 		}
         D(GREEN"send %s %ld bytes."NO, buf, strlen(buf));
 
+        if (strncasecmp(buf, ":3:", 3) == 0) {
+            //if (pthread_kill(thread, SIGINT) != 0)
+            //    E("pthread_kill() failed.");
+
+            cs_free(&buf);
+            ret = close(sockfd);
+
+            D("client logout success");
+            return 0;
+        }
+
         memset(buf, '\0', buflen);
 	}
 
