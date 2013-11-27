@@ -121,23 +121,69 @@ int sql_register(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
 
 
 /* user destroy */
-int sql_destroy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
-{
-    /* check identify */
-    /* delete user */
-    strncpy(wbuf->data, "00", 2);
-    wbuf->len = 2;
-    return 0;
-}
-
-
-/* login */
 int sql_check_identity_cb(void *p, int argc, char **value, char **name)
 {
     (*(int *)p)++;
     return 0;
 }
 
+int sql_destroy(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    if (req == NULL || req->name == NULL || req->passwd == NULL ||
+        db == NULL || wbuf == NULL || wbuf->data == NULL) {
+        E("parameter error.");
+        return -1;
+    }
+
+    char *query_line = (char *)cs_malloc(sizeof(char) * QUERY_LEN_MAX);
+    if (query_line == NULL) {
+        E("cs_malloc() failed.");
+        DPSTR(wbuf);
+        return -1;
+    }
+
+    // FIXME: root del user, user del himself
+    /* check identify */
+    sprintf(query_line, "select * from users where name='%s' and passwd='%s'", 
+            req->name, req->passwd);
+    DS(query_line);
+
+    int sql_select_num = 0;
+    int ret = sqlite3_exec(db, query_line, sql_check_identity_cb, &sql_select_num, NULL);
+    if (ret != SQLITE_OK || sql_select_num != 1) {
+        /* no this user & passwd */
+        E("sqlite3_exec() failed.");
+        DD(sql_select_num);
+        cs_free(&query_line);
+
+        strncpy(wbuf->data, "*", 1);
+        wbuf->len = 1;
+        return -1;
+    }
+
+    /* delete user info in users table */
+    memset(query_line, '\0', QUERY_LEN_MAX);
+    sprintf(query_line, "delete from users where name='%s'", req->name);
+    DS(query_line);
+
+    ret = sqlite3_exec(db, query_line, NULL, NULL, NULL);
+    if (ret != SQLITE_OK) {
+        E("sqlite3_exec() failed.");
+        cs_free(&query_line);
+        return -1;
+    }
+
+    /* delete user info in buddy tables */
+    /* drop user table and user_offline table */
+
+    cs_free(&query_line);
+
+    D(GREEN"user %s login success.", req->name);
+    return 0;
+}
+
+
+/* login */
 int sql_get_buddy_cb(void *p, int argc, char **value, char **name)
 {
     buf_t *wbuf = (buf_t *)p;
@@ -877,6 +923,16 @@ int sql_del_log(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
     cs_free(&query_line);
 
     D(GREEN"clear log with %s success.", req->buddy_name);
+    return 0;
+}
+
+
+/* change passwd */
+int sql_change_passwd(cs_request_t *req, sqlite3 *db, buf_t *wbuf)
+{
+    /* check identify */
+    strncpy(wbuf->data, "00", 2);
+    wbuf->len = 2;
     return 0;
 }
 
