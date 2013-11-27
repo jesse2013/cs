@@ -111,7 +111,7 @@ client的请求
 
 ok 注册用户		:0:troy:troy:::
 
-销毁用户		:1:::::
+ok 销毁用户		:1:::::
 
 ok 登陆			:2:troy:troy:::
 
@@ -128,6 +128,8 @@ ok 与好友聊天	:7:troy:_:zyy:nihao,zyy:20131117100404 (支持离线消息)
 ok 查看聊天记录	:8:troy:_:zyy::
 
 ok 删除聊天记录	:9:troy:_:zyy::
+
+ok 修改密码     :10:troy:troy:_:new_passwd:
 
 
 server的回应
