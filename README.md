@@ -25,7 +25,7 @@
 
 3.实现文件转发
 
-4.windows 图形客户端开发
+4.windows 图形客户端开发 (提示 对方正在输入)
 
 5.客户端实现屏幕截图
 
@@ -129,7 +129,11 @@ ok 查看聊天记录	:8:troy:_:zyy::
 
 ok 删除聊天记录	:9:troy:_:zyy::
 
-ok 修改密码     :10:troy:troy:_:new_passwd:
+ok 修改密码     :10:troy:troy:_:新密码:
+
+查询用户信息	:11:troy:_:zyy:: //(邮箱,手机号,分机号,性别,年龄,家乡,等等)
+
+修改用户信息	:12:troy:_:_:邮箱*手机号*分机号*性别*年龄*家乡:
 
 
 
@@ -152,11 +156,11 @@ server的回应
 ==============================================
 1.全部用户名 及 是否在线状态 的表
 
-create table users(id integer primary key, name text, passwd text, online text, fd integer);
+create table users(id integer primary key, name text, passwd text, fd integer, email text, phone text, tel integer, sex text, age integer, hometown text);
 
-insert into users(name, passwd, online, fd) values('troy', 'troy', 'off', -1);
+insert into users(name, passwd, fd) values('troy', 'troy', -1);
 
-insert into users(name, passwd, online, fd) values('zyy', 'zyy', 'off', -1);
+insert into users(name, passwd, fd) values('zyy', 'zyy', -1);
 
 2.表名为用户名 此用户的所有好友
 
