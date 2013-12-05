@@ -17,17 +17,21 @@
 
 2.linux 命令行客户端开发
 
-3.linux 图形客户端开发
+3.windows 图形客户端开发 (提示 对方正在输入)
+
+4.server 消息全体推送
 
 第二阶段
 
 1.server依据cs.conf文件配置
 
-3.实现文件转发
+2.实现文件转发
 
-4.windows 图形客户端开发 (提示 对方正在输入)
+3.客户端实现屏幕截图
 
-5.客户端实现屏幕截图
+4.群组功能实现
+
+5.linux 图形客户端开发
 
 第三阶段
 
@@ -131,10 +135,9 @@ ok 删除聊天记录	:9:troy:_:zyy::
 
 ok 修改密码     :10:troy:troy:_:新密码:
 
-查询用户信息	:11:troy:_:zyy:: //(邮箱,手机号,分机号,性别,年龄,家乡,等等)
+ok 提交用户信息 :11:troy:_:_:邮箱*手机号*分机号:
 
-修改用户信息	:12:troy:_:_:邮箱*手机号*分机号*性别*年龄*家乡:
-
+ok 查询用户信息	:12:troy:_:zyy::
 
 
 server的回应
@@ -156,11 +159,11 @@ server的回应
 ==============================================
 1.全部用户名 及 是否在线状态 的表
 
-create table users(id integer primary key, name text, passwd text, fd integer, email text, phone text, tel integer, sex text, age integer, hometown text);
+create table users(id integer primary key, name text, passwd text, fd integer, email text, phone text, tel text);
 
-insert into users(name, passwd, fd) values('troy', 'troy', -1);
+insert into users(name, passwd, fd, email, phone, tel) values('troy', 'troy', -1, 'troy@smit.com', '13263102329', '6666');
 
-insert into users(name, passwd, fd) values('zyy', 'zyy', -1);
+insert into users(name, passwd, fd, email, phone, tel) values('zyy', 'zyy', -1, 'zyy@smit.com', '13263102328', '7777');
 
 2.表名为用户名 此用户的所有好友
 

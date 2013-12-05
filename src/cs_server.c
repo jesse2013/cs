@@ -188,7 +188,12 @@ int cs_routine(int fd, sqlite3 *db)
     n = sql_routine(fd, db, rwbuf);
     if (n == -1) {
         E("sql_routine() failed.");
-        return -1;
+        
+        if (rwbuf->wbuf.len == 0) {
+            strncpy(rwbuf->wbuf.data, "err", 3);
+            rwbuf->wbuf.len = 3;
+        }
+        //return -1;
     }
 
     D(GREEN"send %s %d bytes to %d."NO, 

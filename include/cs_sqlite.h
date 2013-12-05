@@ -23,6 +23,17 @@ typedef struct {
     char        *datetime;
 } cs_request_t;
 
+typedef struct {
+    sqlite3 *db;
+    char    *name;
+} destroy_t;
+
+typedef struct {
+    char        *email;
+    char        *phone;
+    char        *tel;
+} user_info_t;
+
 
 int sql_routine(int fd, sqlite3 *db, sockfd_buf_t *rwbuf);
 
