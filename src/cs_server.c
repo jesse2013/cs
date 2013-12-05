@@ -185,6 +185,11 @@ int cs_routine(int fd, sqlite3 *db)
       rwbuf->rbuf.data, n, fd);
     rwbuf->rbuf.len = n;
 
+    DDBUF(rwbuf->rbuf);
+    rwbuf->rbuf.len -= 4;
+    strncpy(rwbuf->rbuf.data, rwbuf->rbuf.data + 4, rwbuf->rbuf.len);
+    DDSTR(rwbuf->rbuf);
+
     n = sql_routine(fd, db, rwbuf);
     if (n == -1) {
         E("sql_routine() failed.");
@@ -198,6 +203,12 @@ int cs_routine(int fd, sqlite3 *db)
 
     D(GREEN"send %s %d bytes to %d."NO, 
       rwbuf->wbuf.data, rwbuf->wbuf.len, fd);
+
+    //rwbuf->wbuf.data[0] = '\0';
+    //rwbuf->wbuf.data[1] = '\0';
+    //rwbuf->wbuf.data[2] = '\0';
+    //rwbuf->wbuf.data[3] = 8;
+    //DDBUF(rwbuf->wbuf);
 
     n = write(fd, rwbuf->wbuf.data, rwbuf->wbuf.len);
     if (n == -1) {
